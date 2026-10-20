@@ -61,6 +61,14 @@ Con el programa de [`apps-script/`](apps-script/LEEME.md) instalado en el Sheets
 Se pide un PIN que el ministerio comparte. Todo se guarda en el mismo Sheets y queda registrado en la pestaña
 *Cambios*. Los archivos adjuntos van a una carpeta de Drive y su link se anota en la columna *Archivos* de *Letras*.
 
+### Composiciones
+
+Con la edición activa aparece la pestaña **Composiciones**, que pide el PIN. Ahí se registran canciones
+nuevas por etapa (Idea, En proceso, Terminada): título, autores, tono, BPM, letra, acordes, notas y los audios
+de referencia de cada momento, que se graban desde el teléfono o se suben como archivo (hasta 25 MB).
+Cuando una está *Terminada*, el botón **Pasar al repertorio** la agrega a la lista de canciones con su letra
+y acordes. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
+
 ## Publicarla (GitHub Pages, gratis)
 
 En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save**.

@@ -1,0 +1,384 @@
+// Composiciones del ministerio: letra, acordes y audios de referencia de cada etapa.
+// No están en la hoja pública; se leen y guardan a través del Apps Script con el PIN.
+import { setupApi, readBase64 } from './api.js';
+import { keyName, parseKey, transposeKey, semitonesBetween, useFlats } from './music.js';
+import { renderChordSheet, renderLyrics, lyricsFromChords, sheetKey, metadata } from './chordpro.js';
+
+export const STAGES = ['Idea', 'En proceso', 'Terminada', 'En repertorio'];
+const MAX_AUDIO = 25 * 1024 * 1024;
+
+/** ctx: { app, store, esc, backHeader, homeHeader, loadSongs } desde app.js */
+export function setupCompositions(ctx) {
+  const { app, store, esc, backHeader, homeHeader, loadSongs } = ctx;
+  const { api, who } = setupApi(store);
+  const data = { items: null, audios: [], error: '' };
+  const shifts = {}; // transposición por composición, solo mientras la app está abierta
+
+  const toComp = (r) => ({
+    id: String(r.ID),
+    title: String(r['Título'] || ''),
+    authors: String(r.Autores || ''),
+    stage: String(r.Estado || 'Idea'),
+    key: parseKey(String(r.Tono || '')),
+    bpm: parseInt(r.BPM, 10) || null,
+    lyrics: String(r.Letra || ''),
+    chords: String(r.Acordes || ''),
+    notes: String(r.Notas || ''),
+    updated: r.Actualizada || r.Creada || '',
+  });
+
+  async function load() {
+    try {
+      const res = await api('listCompositions');
+      data.items = res.items.map(toComp).filter((c) => c.id && c.title);
+      data.audios = res.audios;
+      data.error = '';
+    } catch (err) {
+      data.error = err.message;
+    }
+  }
+
+  const byId = (id) => data.items?.find((c) => c.id === id);
+  const audiosOf = (id) =>
+    data.audios.filter((a) => String(a['Composición']) === id).sort((a, b) => String(b.Fecha).localeCompare(String(a.Fecha)));
+
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const stageClass = (s) => ({ Idea: 'none', 'En proceso': 'warn', Terminada: 'ok', 'En repertorio': 'ok' })[s] || 'none';
+
+  /** Link de Drive → archivo directo para el reproductor del teléfono. */
+  const driveId = (url) => (String(url).match(/\/d\/([A-Za-z0-9_-]+)/) || String(url).match(/[?&]id=([A-Za-z0-9_-]+)/) || [])[1];
+
+  // Primera visita: hay que pedir el PIN antes de mostrar nada.
+  async function ensure(then) {
+    if (data.items) return then();
+    app.innerHTML = `${homeHeader('comps')}<p class="empty">Cargando composiciones…</p>`;
+    await load();
+    if (!data.items) {
+      app.innerHTML = `${homeHeader('comps')}
+        <article class="detail">
+          <p class="empty">${esc(data.error || 'No se pudieron cargar las composiciones.')}</p>
+          <button data-action="comp-retry">Intentar de nuevo</button>
+        </article>`;
+      app.querySelector('[data-action="comp-retry"]').addEventListener('click', () => ensure(then));
+      return;
+    }
+    then();
+  }
+
+  // ---------- lista ----------
+  function renderList() {
+    document.title = 'Zamar · Composiciones';
+    ensure(() => {
+      const items = [...data.items].sort(
+        (a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || String(b.updated).localeCompare(String(a.updated)),
+      );
+      app.innerHTML = `
+        ${homeHeader('comps')}
+        <div class="row edittools">
+          <a class="button ghost" href="#/comp/nueva">+ Nueva idea</a>
+          <button class="button ghost" data-action="comp-reload">⟳ Actualizar</button>
+        </div>
+        <div class="list">
+          ${
+            items.length
+              ? items
+                  .map((c) => {
+                    const n = audiosOf(c.id).length;
+                    return `<a class="song" href="#/comp/${encodeURIComponent(c.id)}">
+                      <span class="song-main">
+                        <span class="song-title">${esc(c.title)}</span>
+                        <span class="song-sub">${esc(c.authors || 'Sin autores')} · ${esc(c.stage)}${n ? ` · ${n} audio${n > 1 ? 's' : ''}` : ''}</span>
+                      </span>
+                      <span class="song-meta">
+                        ${c.key ? `<span class="key">${esc(keyName(c.key))}</span>` : ''}
+                        ${c.bpm ? `<span class="bpm">${c.bpm}</span>` : ''}
+                        <span class="dot ${stageClass(c.stage)}" title="${esc(c.stage)}"></span>
+                      </span>
+                    </a>`;
+                  })
+                  .join('')
+              : '<p class="empty">Todavía no hay composiciones. Empieza con una idea, aunque sea un audio de 20 segundos.</p>'
+          }
+        </div>
+        <p class="hint">Solo las ve quien tiene el PIN del ministerio.</p>`;
+      app.querySelector('[data-action="comp-reload"]').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        await load();
+        renderList();
+      });
+    });
+  }
+
+  // ---------- una composición ----------
+  function renderOne(id) {
+    ensure(() => {
+      const c = byId(id);
+      if (!c) {
+        app.innerHTML = `${backHeader('#/comp', 'Composiciones')}<p class="empty">No encontré esta composición.</p>`;
+        return;
+      }
+      document.title = `${c.title} · Composiciones`;
+      const shift = shifts[c.id] || 0;
+      const key = c.key ? transposeKey(c.key, shift) : null;
+      const written = sheetKey(c.chords) || c.key;
+      const chordShift = key && written ? semitonesBetween(written, key) : 0;
+      const lyrics = c.lyrics || lyricsFromChords(c.chords);
+      let view = store.get('zamar:compview', 'letra');
+      const audios = audiosOf(c.id);
+
+      app.innerHTML = `
+        ${backHeader('#/comp', 'Composiciones')}
+        <article class="detail">
+          <h1>${esc(c.title)}</h1>
+          <p class="author">${esc(c.authors || 'Sin autores')}</p>
+          <p class="status"><span class="dot ${stageClass(c.stage)}"></span> ${esc(c.stage)}
+            <a class="editlink" href="#/comp/${encodeURIComponent(c.id)}/editar">✎ Editar</a></p>
+
+          <section class="card keybox">
+            <div class="keynow"><span class="label">Tono</span><span class="big ${key ? '' : 'muted'}">${key ? esc(keyName(key)) : '—'}</span>
+              ${shift ? `<span class="orig">escrita: ${esc(keyName(c.key))}</span>` : ''}</div>
+            ${key ? `<div class="keyctl two"><button data-shift="-1" aria-label="Bajar medio tono">−½</button><button data-shift="1" aria-label="Subir medio tono">+½</button></div>` : ''}
+            <div class="keynow"><span class="label">BPM</span><span class="big ${c.bpm ? '' : 'muted'}">${c.bpm || '—'}</span></div>
+          </section>
+
+          <section>
+            <h2>Audios</h2>
+            <div class="recorder">
+              <input id="alabel" placeholder="¿Qué es? Por ejemplo: idea del coro, versión piano" aria-label="Etiqueta del audio">
+              <div class="row">
+                <button data-action="rec" id="recbtn">● Grabar</button>
+                <label class="button ghost filepick">Elegir archivo<input type="file" id="afile" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg" hidden></label>
+              </div>
+              <p class="hint" id="amsg"></p>
+            </div>
+            <ol class="audios">
+              ${
+                audios.length
+                  ? audios
+                      .map((a) => {
+                        const fid = driveId(a.Link);
+                        return `<li class="audio">
+                          <div class="song-main">
+                            <span class="song-title">${esc(a.Etiqueta || a.Archivo)}</span>
+                            <span class="song-sub">${esc(fmt(a.Fecha))}${a['Quién'] ? ` · ${esc(a['Quién'])}` : ''}</span>
+                          </div>
+                          ${fid ? `<audio controls preload="none" src="https://drive.google.com/uc?export=download&id=${esc(fid)}"></audio>` : ''}
+                          ${/^https:\/\//.test(a.Link) ? `<a class="hint" href="${esc(a.Link)}" target="_blank" rel="noopener">Abrir en Drive</a>` : ''}
+                        </li>`;
+                      })
+                      .join('')
+                  : '<p class="hint">Aún no hay audios. Graba la idea tal cual salga; aquí queda la historia de la canción.</p>'
+              }
+            </ol>
+          </section>
+
+          <section>
+            <div class="tabs" role="tablist" style="grid-template-columns: repeat(2, 1fr)">
+              <button role="tab" data-view="letra" aria-selected="${view === 'letra'}">Letra</button>
+              <button role="tab" data-view="acordes" aria-selected="${view === 'acordes'}">Acordes</button>
+            </div>
+            ${
+              view === 'acordes'
+                ? c.chords
+                  ? `<div class="sheet">${renderChordSheet(c.chords, chordShift, useFlats(key))}</div>`
+                  : '<p class="hint">Aún no hay acordes.</p>'
+                : lyrics
+                  ? `<div class="sheet lyrics">${renderLyrics(lyrics)}</div>`
+                  : '<p class="hint">Aún no hay letra.</p>'
+            }
+          </section>
+
+          ${c.notes ? `<section><h2>Notas</h2><p class="teamnotes">${esc(c.notes)}</p></section>` : ''}
+
+          ${
+            c.stage === 'Terminada'
+              ? `<section><button class="primary" data-action="promote">Pasar al repertorio</button>
+                 <p class="hint" id="pmsg">Se agrega a la lista de canciones con su letra y acordes.</p></section>`
+              : ''
+          }
+          <p class="hint">Actualizada ${esc(fmt(c.updated))}</p>
+        </article>`;
+
+      app.querySelectorAll('[data-shift]').forEach((b) =>
+        b.addEventListener('click', () => {
+          shifts[c.id] = (((shift + Number(b.dataset.shift)) % 12) + 12) % 12;
+          if (shifts[c.id] > 6) shifts[c.id] -= 12;
+          renderOne(c.id);
+        }),
+      );
+      app.querySelectorAll('[data-view]').forEach((b) =>
+        b.addEventListener('click', () => {
+          store.set('zamar:compview', b.dataset.view);
+          renderOne(c.id);
+        }),
+      );
+      setupAudio(c);
+      app.querySelector('[data-action="promote"]')?.addEventListener('click', async (e) => {
+        if (!confirm(`¿Agregar “${c.title}” al repertorio?`)) return;
+        e.target.disabled = true;
+        const msg = app.querySelector('#pmsg');
+        msg.textContent = 'Agregando…';
+        try {
+          await api('promoteComposition', { id: c.id });
+          c.stage = 'En repertorio';
+          setTimeout(() => loadSongs({ quiet: true }), 4000);
+          renderOne(c.id);
+        } catch (err) {
+          msg.textContent = err.message;
+          e.target.disabled = false;
+        }
+      });
+    });
+  }
+
+  // ---------- grabar o subir audio ----------
+  function setupAudio(c) {
+    const msg = (t) => (app.querySelector('#amsg').textContent = t);
+    const label = () => app.querySelector('#alabel').value.trim();
+
+    async function upload(blob, name) {
+      if (blob.size > MAX_AUDIO) return msg('El audio pesa más de 25 MB. Prueba con uno más corto.');
+      msg('Subiendo audio…');
+      try {
+        const { audio } = await api('uploadAudio', {
+          id: c.id,
+          label: label(),
+          name,
+          mimeType: blob.type || 'audio/mpeg',
+          data: await readBase64(blob),
+        });
+        data.audios.push(audio);
+        renderOne(c.id);
+      } catch (err) {
+        msg(err.message);
+      }
+    }
+
+    app.querySelector('#afile').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) upload(file, file.name);
+    });
+
+    const btn = app.querySelector('#recbtn');
+    if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+      btn.disabled = true;
+      btn.title = 'Este navegador no puede grabar; usa Elegir archivo';
+      return;
+    }
+    let rec = null;
+    let timer = null;
+    btn.addEventListener('click', async () => {
+      if (rec) return rec.stop();
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        return msg('No hay permiso para usar el micrófono.');
+      }
+      // iPhone graba en mp4; Android y computadoras en webm.
+      const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported?.(t)) || '';
+      rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const chunks = [];
+      const started = Date.now();
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        clearInterval(timer);
+        stream.getTracks().forEach((t) => t.stop());
+        const mime = rec.mimeType || type || 'audio/webm';
+        rec = null;
+        btn.textContent = '● Grabar';
+        btn.classList.remove('danger');
+        const blob = new Blob(chunks, { type: mime.split(';')[0] });
+        const ext = mime.includes('mp4') ? 'm4a' : 'webm';
+        const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', 'h');
+        upload(blob, `${c.title} · ${label() || 'grabación'} · ${stamp}.${ext}`);
+      };
+      rec.start();
+      btn.textContent = '■ Detener';
+      btn.classList.add('danger');
+      timer = setInterval(() => {
+        const s = Math.round((Date.now() - started) / 1000);
+        msg(`Grabando ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+      }, 500);
+    });
+  }
+
+  // ---------- crear y editar ----------
+  function renderEdit(id) {
+    ensure(() => {
+      const c = id ? byId(id) : null;
+      if (id && !c) {
+        app.innerHTML = `${backHeader('#/comp', 'Composiciones')}<p class="empty">No encontré esta composición.</p>`;
+        return;
+      }
+      const v = c || { title: '', authors: who(), stage: 'Idea', key: null, bpm: null, lyrics: '', chords: '', notes: '' };
+      const back = c ? `#/comp/${encodeURIComponent(c.id)}` : '#/comp';
+      document.title = `${c ? 'Editar' : 'Nueva'} composición · Zamar`;
+      app.innerHTML = `
+        ${backHeader(back, c ? c.title : 'Composiciones')}
+        <form class="detail editor" id="editor">
+          <h1>${c ? 'Editar composición' : 'Nueva composición'}</h1>
+          <label class="field"><span>Título</span><input name="Título" value="${esc(v.title)}" required placeholder="Aunque sea provisional"></label>
+          <label class="field"><span>Autores</span><input name="Autores" value="${esc(v.authors)}"></label>
+          <div class="row three">
+            <label class="field"><span>Etapa</span><select name="Estado">${STAGES.map((s) => `<option ${s === v.stage ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+            <label class="field"><span>Tono</span><input name="Tono" value="${esc(v.key ? keyName(v.key) : '')}" placeholder="G, Bb, F#m…"></label>
+            <label class="field"><span>BPM</span><input name="BPM" value="${esc(v.bpm || '')}" inputmode="numeric" pattern="[0-9]*"></label>
+          </div>
+          <label class="field"><span>Letra</span><textarea name="Letra" rows="8" spellcheck="true" class="prose">${esc(v.lyrics)}</textarea></label>
+          <label class="field"><span>Acordes (ChordPro) <button type="button" class="link" data-pick="cho">Cargar .cho</button></span>
+            <textarea name="Acordes" rows="10" spellcheck="false" placeholder="[G]Primera [D]línea del coro…">${esc(v.chords)}</textarea></label>
+          <input type="file" id="chofile" accept=".cho,.chopro,.chordpro,.crd,.txt,text/plain" hidden>
+          <label class="field"><span>Notas</span><textarea name="Notas" rows="4" spellcheck="true" class="prose" placeholder="Ideas pendientes, estructura, quién hace qué…">${esc(v.notes)}</textarea></label>
+          <p class="hint" id="editmsg"></p>
+          <div class="row actions">
+            <button type="submit" class="primary">Guardar</button>
+            <a class="button ghost" href="${back}">Cancelar</a>
+          </div>
+        </form>`;
+      const form = app.querySelector('#editor');
+      const msg = (t) => (app.querySelector('#editmsg').textContent = t);
+      app.querySelector('[data-pick="cho"]').addEventListener('click', () => app.querySelector('#chofile').click());
+      app.querySelector('#chofile').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        form.elements.Acordes.value = text;
+        const meta = metadata(text);
+        if (meta.key && !form.elements.Tono.value && parseKey(meta.key)) form.elements.Tono.value = meta.key;
+        if (meta.tempo && !form.elements.BPM.value) form.elements.BPM.value = Math.round(parseFloat(meta.tempo)) || '';
+        msg(`Cargué ${file.name}. Revisa y toca Guardar.`);
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fields = {};
+        for (const n of ['Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas']) {
+          fields[n] = form.elements[n].value.replace(/\s+$/, '');
+        }
+        fields['Título'] = fields['Título'].trim();
+        if (fields.Tono && !parseKey(fields.Tono)) return msg(`No reconozco el tono "${fields.Tono}". Usa algo como G, Bb o F#m.`);
+        const button = form.querySelector('[type="submit"]');
+        button.disabled = true;
+        msg('Guardando…');
+        try {
+          const res = await api('saveComposition', { id: c?.id || '', fields });
+          const row = { ID: res.id, ...fields, Actualizada: new Date().toISOString() };
+          const updated = toComp(row);
+          if (c) Object.assign(c, updated);
+          else data.items.push(updated);
+          location.hash = `#/comp/${encodeURIComponent(res.id)}`;
+        } catch (err) {
+          msg(err.message);
+          button.disabled = false;
+        }
+      });
+    });
+  }
+
+  return { renderList, renderOne, renderEdit };
+}

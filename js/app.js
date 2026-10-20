@@ -13,7 +13,9 @@ import {
   decodeSetlist,
   importSetlist,
 } from './setlists.js';
-import { canEdit, setupEditing } from './edit.js';
+import { canEdit } from './api.js';
+import { setupEditing } from './edit.js';
+import { setupCompositions } from './compositions.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -105,6 +107,8 @@ async function loadSongs({ quiet = false } = {}) {
       state.updatedAt = new Date(snap.actualizado + 'T12:00:00');
     }
   }
+  // Una recarga en segundo plano no debe borrar un formulario o una grabación a medias.
+  if (quiet && /^#\/(comp(\/|$)|editar|nueva|importar)/.test(location.hash)) return;
   render();
 }
 
@@ -150,6 +154,7 @@ function homeHeader(active) {
     <nav class="nav">
       <a href="#/" ${active === 'songs' ? 'aria-current="page"' : ''}>Canciones</a>
       <a href="#/sets" ${active === 'sets' ? 'aria-current="page"' : ''}>Setlists</a>
+      ${canEdit() ? `<a href="#/comp" ${active === 'comps' ? 'aria-current="page"' : ''}>Composiciones</a>` : ''}
     </nav>`;
 }
 
@@ -674,6 +679,7 @@ function renderSetlist(id, shared = null) {
 
 // ---------- navegación ----------
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
+const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
 
 function route() {
   const h = location.hash;
@@ -682,6 +688,10 @@ function route() {
     if ((m = h.match(/^#\/editar\/(.+)$/))) return () => editing.renderEdit(decodeURIComponent(m[1]));
     if (h === '#/nueva') return () => editing.renderEdit('');
     if (h === '#/importar') return editing.renderImport;
+    if (h === '#/comp') return comps.renderList;
+    if (h === '#/comp/nueva') return () => comps.renderEdit('');
+    if ((m = h.match(/^#\/comp\/([^/]+)\/editar$/))) return () => comps.renderEdit(decodeURIComponent(m[1]));
+    if ((m = h.match(/^#\/comp\/([^/]+)$/))) return () => comps.renderOne(decodeURIComponent(m[1]));
   }
   if ((m = h.match(/^#\/c\/(.+)$/))) return () => renderSong(decodeURIComponent(m[1]));
   if ((m = h.match(/^#\/set\/([^/]+)\/(\d+)$/))) {

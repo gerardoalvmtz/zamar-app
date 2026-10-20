@@ -31,6 +31,18 @@ del Sheets permite deshacer cualquier cosa.
 
 La columna "Acordes actualizados (Songbook)" y las que no estén en la lista de arriba nunca se modifican.
 
+## Composiciones (privadas)
+
+La sección **Composiciones** de la app guarda letra, acordes, notas y audios de canciones nuevas.
+No van en el Sheets público: el script crea en tu Drive una hoja aparte, **"Zamar · Composiciones"**
+(pestañas *Composiciones* y *Audios*), y la carpeta **"Zamar · Audios de composiciones"**. La app solo
+las muestra a quien escribe el PIN. Los audios quedan con permiso "cualquiera con el link", pero ese link
+solo aparece dentro de la sección con PIN.
+
+Después de pegar el código nuevo, en el editor elige la función **prepararComposiciones** en la lista de
+arriba y toca **▶ Ejecutar**. Google pide permisos otra vez (ahora también para crear la hoja); acéptalos.
+Luego vuelve a implementar como se explica abajo.
+
 ## Si cambias el código
 
 Después de pegar una versión nueva: **Implementar → Administrar implementaciones → editar (lápiz) →

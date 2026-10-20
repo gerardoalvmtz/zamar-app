@@ -17,6 +17,7 @@ import { canEdit } from './api.js';
 import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
+import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -348,6 +349,28 @@ function renderSong(id, ctx = null) {
     tabs: `<pre class="sheet">${esc(tabs)}</pre>`,
   };
 
+  const nextItem = ctx ? ctx.set.items[ctx.index + 1] : null;
+  const nextSong = nextItem ? songById(nextItem.id) : null;
+  const nextKey = nextItem ? parseKey(nextItem.key) || nextSong?.key || null : null;
+  const nextBridge = key && nextKey ? bridges(key, nextKey) : null;
+  const nextUp = nextItem
+    ? `<section class="nextup">
+        <h2>Para llegar a la siguiente</h2>
+        <a class="nextsong" href="#/set/${ctx.set.id}/${ctx.index + 1}">
+          <span class="song-title">${esc(nextSong ? nextSong.title : 'Canción no encontrada')}</span>
+          <span class="song-meta">${nextKey ? `<span class="key">${esc(keyName(nextKey))}</span>` : ''}${nextSong?.bpm ? `<span class="bpm">${nextSong.bpm}</span>` : ''}</span>
+        </a>
+        ${
+          nextBridge
+            ? `<p class="hint">${esc(CLOSENESS[nextBridge.closeness])}</p>
+               ${bridgeHtml({ ...nextBridge, options: nextBridge.options.slice(0, 1) }, esc)}
+               ${nextBridge.options.length > 1 ? `<details class="more"><summary>Ver otros caminos</summary>${bridgeHtml({ ...nextBridge, options: nextBridge.options.slice(1), tip: '' }, esc, { recommend: false })}</details>` : ''}`
+            : '<p class="hint">Falta el tono de alguna de las dos canciones para calcular el puente.</p>'
+        }
+        ${tempoTip(song.bpm, nextSong?.bpm) ? `<p class="hint tip">🥁 ${esc(tempoTip(song.bpm, nextSong.bpm))}</p>` : ''}
+      </section>`
+    : '';
+
   const nav = ctx
     ? `<div class="setnav">
         ${ctx.index > 0 ? `<a class="button ghost" href="#/set/${ctx.set.id}/${ctx.index - 1}">‹ Anterior</a>` : '<span></span>'}
@@ -445,6 +468,7 @@ function renderSong(id, ctx = null) {
 
       <section>
         <h2>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</h2>
+        ${key ? `<p class="hint"><a href="#/puente/${encodeURIComponent(keyName(key))}">🧭 Ver el puente hacia cualquier tono</a></p>` : ''}
         ${
           !key
             ? '<p class="hint">Sin tonalidad no puedo sugerir canciones.</p>'
@@ -466,6 +490,7 @@ function renderSong(id, ctx = null) {
               : '<p class="hint">Todavía no hay canciones con tonalidad compatible.</p>'
         }
       </section>
+      ${nextUp}
     </article>
     ${nav}`;
 
@@ -545,7 +570,8 @@ function renderSetlists() {
           : '<p class="empty">Todavía no hay setlists en este teléfono.</p>'
       }
     </div>
-    <p class="hint">Los setlists se guardan en este teléfono. Para pasarlos al equipo usa “Compartir”.</p>`;
+    <p class="hint">Los setlists se guardan en este teléfono. Para pasarlos al equipo usa “Compartir”.</p>
+    <a class="button ghost bridgelink" href="#/puente">🧭 Puente entre dos tonos</a>`;
   app.querySelector('#newset').addEventListener('submit', (e) => {
     e.preventDefault();
     const set = createSetlist(app.querySelector('#setname').value.trim(), app.querySelector('#setdate').value);
@@ -559,7 +585,8 @@ function setItems(set) {
     const key = parseKey(item.key) || song?.key || null;
     const prev = i > 0 ? parseKey(set.items[i - 1].key) || songById(set.items[i - 1].id)?.key : null;
     const rel = prev && key ? keyRelation(prev, key) : null;
-    return { item, i, song, key, transition: rel ? rel.label || 'Cambio de tono' : '' };
+    const changes = rel && (prev.pc !== key.pc || prev.minor !== key.minor);
+    return { item, i, song, key, transition: rel ? rel.label || 'Cambio de tono' : '', bridge: changes ? bridges(prev, key) : null };
   });
 }
 
@@ -590,8 +617,14 @@ function renderSetlist(id, shared = null) {
           rows.length
             ? rows
                 .map(
-                  ({ item, i, song, key, transition }) => `<li>
-                ${transition ? `<span class="transition">${esc(transition)}</span>` : ''}
+                  ({ item, i, song, key, transition, bridge }) => `<li>
+                ${
+                  bridge
+                    ? `<details class="transition"><summary>${esc(transition)} · <u>ver puente</u></summary>${bridgeHtml(bridge, esc)}</details>`
+                    : transition
+                      ? `<span class="transition">${esc(transition)}</span>`
+                      : ''
+                }
                 <div class="setrow">
                   <span class="num">${i + 1}</span>
                   <a class="song-main" href="${shared ? (song ? `#/c/${encodeURIComponent(song.id)}` : '#') : `#/set/${set.id}/${i}`}">
@@ -684,6 +717,39 @@ function renderSetlist(id, shared = null) {
   });
 }
 
+// ---------- puente entre dos tonos ----------
+const ALL_KEYS = [false, true].flatMap((minor) => Array.from({ length: 12 }, (_, pc) => keyName({ pc, minor })));
+
+function renderBridgePage(fromText = '', toText = '') {
+  document.title = 'Zamar · Puente entre tonos';
+  const from = parseKey(fromText) || parseKey(store.get('zamar:bridgefrom', 'G'));
+  const to = parseKey(toText) || parseKey(store.get('zamar:bridgeto', 'A'));
+  const opt = (k) => ALL_KEYS.map((n) => `<option ${n === keyName(k) ? 'selected' : ''}>${n}</option>`).join('');
+  const b = bridges(from, to);
+  app.innerHTML = `
+    ${backHeader('#/sets', 'Setlists')}
+    <article class="detail">
+      <h1>Puente entre tonos</h1>
+      <p class="author">Qué tocar al final de una canción para llegar a la siguiente sin que suene brusco.</p>
+      <div class="row keypair">
+        <label class="field"><span>Termina en</span><select id="bfrom">${opt(from)}</select></label>
+        <label class="field"><span>Sigue en</span><select id="bto">${opt(to)}</select></label>
+      </div>
+      <p class="hint">${esc(CLOSENESS[b.closeness])}${b.relation ? ` · ${esc(b.relation)}` : ''}</p>
+      ${bridgeHtml(b, esc)}
+    </article>`;
+  const go = () => {
+    const f = app.querySelector('#bfrom').value;
+    const t = app.querySelector('#bto').value;
+    store.set('zamar:bridgefrom', f);
+    store.set('zamar:bridgeto', t);
+    history.replaceState(null, '', `#/puente/${encodeURIComponent(f)}/${encodeURIComponent(t)}`);
+    renderBridgePage(f, t);
+  };
+  app.querySelector('#bfrom').addEventListener('change', go);
+  app.querySelector('#bto').addEventListener('change', go);
+}
+
 // ---------- navegación ----------
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
@@ -718,6 +784,8 @@ function route() {
     if (shared) return () => renderSetlist('', shared);
   }
   if (h === '#/sets') return renderSetlists;
+  if ((m = h.match(/^#\/puente(?:\/([^/]*))?(?:\/([^/]*))?$/)))
+    return () => renderBridgePage(decodeURIComponent(m[1] || ''), decodeURIComponent(m[2] || ''));
   return renderList;
 }
 

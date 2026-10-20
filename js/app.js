@@ -295,9 +295,14 @@ function spotifyEmbed(url) {
  * ctx: { set, index } cuando la canción se abre desde un setlist; entonces el tono
  * viene del setlist y los botones de tono lo cambian ahí.
  */
-function renderSong(id, ctx = null) {
+function renderSong(id, ctx = null, came = null) {
   const song = songById(id);
-  const back = ctx ? backHeader(`#/set/${ctx.set.id}`, ctx.set.name) : backHeader('#/', 'Repertorio');
+  const fromSong = came ? songById(came.id) : null;
+  const back = ctx
+    ? backHeader(`#/set/${ctx.set.id}`, ctx.set.name)
+    : fromSong
+      ? backHeader(`#/c/${encodeURIComponent(fromSong.id)}`, fromSong.title)
+      : backHeader('#/', 'Repertorio');
   if (!song) {
     app.innerHTML = `${back}<p class="empty">No encontré esta canción. Quizá cambió de nombre en la hoja.</p>`;
     return;
@@ -353,6 +358,28 @@ function renderSong(id, ctx = null) {
   const nextSong = nextItem ? songById(nextItem.id) : null;
   const nextKey = nextItem ? parseKey(nextItem.key) || nextSong?.key || null : null;
   const nextBridge = key && nextKey ? bridges(key, nextKey) : null;
+  // Puente recomendado y, plegados, los demás caminos.
+  const bridgeBlock = (b, bpmA, bpmB) =>
+    (b
+      ? `<p class="hint">${esc(CLOSENESS[b.closeness])}</p>
+         ${bridgeHtml({ ...b, options: b.options.slice(0, 1) }, esc)}
+         ${b.options.length > 1 ? `<details class="more"><summary>Ver otros caminos</summary>${bridgeHtml({ ...b, options: b.options.slice(1), tip: '' }, esc, { recommend: false })}</details>` : ''}`
+      : '<p class="hint">Falta el tono de alguna de las dos canciones para calcular el puente.</p>') +
+    (tempoTip(bpmA, bpmB) ? `<p class="hint tip">🥁 ${esc(tempoTip(bpmA, bpmB))}</p>` : '');
+
+  // Si se llegó desde "Para conectar" de otra canción: cómo pasar de aquella a esta.
+  const cameKey = came ? parseKey(came.key) || fromSong?.key || null : null;
+  const cameFrom = fromSong
+    ? `<section class="nextup camefrom">
+        <h2>Para llegar desde</h2>
+        <a class="nextsong" href="#/c/${encodeURIComponent(fromSong.id)}">
+          <span class="song-title">‹ ${esc(fromSong.title)}</span>
+          <span class="song-meta">${cameKey ? `<span class="key">${esc(keyName(cameKey))}</span>` : ''}${fromSong.bpm ? `<span class="bpm">${fromSong.bpm}</span>` : ''}</span>
+        </a>
+        ${bridgeBlock(cameKey && key ? bridges(cameKey, key) : null, fromSong.bpm, song.bpm)}
+      </section>`
+    : '';
+
   const nextUp = nextItem
     ? `<section class="nextup">
         <h2>Para llegar a la siguiente</h2>
@@ -360,14 +387,7 @@ function renderSong(id, ctx = null) {
           <span class="song-title">${esc(nextSong ? nextSong.title : 'Canción no encontrada')}</span>
           <span class="song-meta">${nextKey ? `<span class="key">${esc(keyName(nextKey))}</span>` : ''}${nextSong?.bpm ? `<span class="bpm">${nextSong.bpm}</span>` : ''}</span>
         </a>
-        ${
-          nextBridge
-            ? `<p class="hint">${esc(CLOSENESS[nextBridge.closeness])}</p>
-               ${bridgeHtml({ ...nextBridge, options: nextBridge.options.slice(0, 1) }, esc)}
-               ${nextBridge.options.length > 1 ? `<details class="more"><summary>Ver otros caminos</summary>${bridgeHtml({ ...nextBridge, options: nextBridge.options.slice(1), tip: '' }, esc, { recommend: false })}</details>` : ''}`
-            : '<p class="hint">Falta el tono de alguna de las dos canciones para calcular el puente.</p>'
-        }
-        ${tempoTip(song.bpm, nextSong?.bpm) ? `<p class="hint tip">🥁 ${esc(tempoTip(song.bpm, nextSong.bpm))}</p>` : ''}
+        ${bridgeBlock(nextBridge, song.bpm, nextSong?.bpm)}
       </section>`
     : '';
 
@@ -422,6 +442,7 @@ function renderSong(id, ctx = null) {
         <div class="keynow"><span class="label">BPM</span><span class="big ${song.bpm ? '' : 'muted'}">${song.bpm || '—'}</span></div>
       </section>
 
+      ${cameFrom}
       ${safeUrl(song.spotify) ? `<section class="listen">${spotifyEmbed(song.spotify) || `<a class="button" href="${esc(song.spotify)}" target="_blank" rel="noopener">Escuchar en Spotify</a>`}</section>` : ''}
       ${safeUrl(song.link) ? `<section class="listen"><a class="button ghost" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
 
@@ -475,7 +496,7 @@ function renderSong(id, ctx = null) {
             : sugg.length
               ? `<div class="list">${sugg
                   .map(
-                    (x) => `<a class="song" href="#/c/${encodeURIComponent(x.song.id)}">
+                    (x) => `<a class="song" href="#/c/${encodeURIComponent(x.song.id)}?de=${encodeURIComponent(song.id)}&tono=${encodeURIComponent(keyName(key))}">
                       <span class="song-main">
                         <span class="song-title">${esc(x.song.title)}</span>
                         <span class="song-sub">${x.reasons.map(esc).join(' · ')}</span>
@@ -494,7 +515,7 @@ function renderSong(id, ctx = null) {
     </article>
     ${nav}`;
 
-  const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index });
+  const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index }, came);
   const moveKey = (d) => {
     if (ctx) {
       ctx.set.items[ctx.index].key = keyName(transposeKey(key, d));
@@ -771,7 +792,11 @@ function route() {
     if ((m = h.match(/^#\/agenda\/([^/]+)\/editar$/))) return () => agenda.renderEdit(decodeURIComponent(m[1]));
     if ((m = h.match(/^#\/agenda\/([^/]+)$/))) return () => agenda.renderOne(decodeURIComponent(m[1]));
   }
-  if ((m = h.match(/^#\/c\/(.+)$/))) return () => renderSong(decodeURIComponent(m[1]));
+  if ((m = h.match(/^#\/c\/([^?]+)(?:\?(.*))?$/))) {
+    const q = new URLSearchParams(m[2] || '');
+    const came = q.get('de') ? { id: q.get('de'), key: q.get('tono') || '' } : null;
+    return () => renderSong(decodeURIComponent(m[1]), null, came);
+  }
   if ((m = h.match(/^#\/set\/([^/]+)\/(\d+)$/))) {
     const set = getSetlist(m[1]);
     const index = Number(m[2]);

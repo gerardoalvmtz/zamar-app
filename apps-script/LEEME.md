@@ -35,7 +35,7 @@ La columna "Acordes actualizados (Songbook)" y las que no estén en la lista de 
 
 La sección **Composiciones** de la app guarda letra, acordes, notas y audios de canciones nuevas.
 No van en el Sheets público: el script crea en tu Drive una hoja aparte, **"Zamar · Composiciones"**
-(pestañas *Composiciones* y *Audios*), y la carpeta **"Zamar · Audios de composiciones"**. La app solo
+(pestañas *Composiciones*, *Audios* y *Comentarios*; la de comentarios se crea sola la primera vez), y la carpeta **"Zamar · Audios de composiciones"**. La app solo
 las muestra a quien escribe el PIN. Los audios quedan con permiso "cualquiera con el link", pero ese link
 solo aparece dentro de la sección con PIN.
 

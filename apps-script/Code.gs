@@ -26,7 +26,12 @@ const EVENT_EDITABLE = EVENT_HEADERS.filter((h) => ['ID', 'Creado', 'Actualizado
 const EVENT_TEXT = ['Fecha', 'Hora', 'Llegada', 'Fin', 'Teléfono'];
 const RSVP_HEADERS = ['Evento', 'Quién', 'Respuesta', 'Rol', 'Fecha'];
 const RSVP_ANSWERS = ['Voy', 'Tal vez', 'No puedo'];
-const PRIVATE_TABS = { Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS };
+// Comentarios del equipo sobre una composición o sobre uno de sus audios (Audio = link del audio).
+const COMMENT_HEADERS = ['ID', 'Composición', 'Audio', 'Quién', 'Comentario', 'Fecha'];
+const PRIVATE_TABS = {
+  Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Comentarios: COMMENT_HEADERS,
+  Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS,
+};
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -260,7 +265,12 @@ const ACTIONS = {
 
   // ---------- composiciones ----------
   listCompositions() {
-    return { ok: true, items: records(compSheet('Composiciones')), audios: records(compSheet('Audios')) };
+    return {
+      ok: true,
+      items: records(compSheet('Composiciones')),
+      audios: records(compSheet('Audios')),
+      comments: records(compSheet('Comentarios')),
+    };
   },
 
   saveComposition(p) {
@@ -302,6 +312,33 @@ const ACTIONS = {
     compSheet('Audios').appendRow(AUDIO_HEADERS.map((h) => audio[h]));
     log('Audio de composición', p.id, name, p.who);
     return { ok: true, audio: audio };
+  },
+
+  addComment(p) {
+    if (!findById(compSheet('Composiciones'), p.id)) throw new Error('No encontré la composición.');
+    const text = String(p.text || '').trim().slice(0, 2000);
+    if (!text) throw new Error('El comentario está vacío.');
+    const comment = {
+      ID: 'm' + Utilities.getUuid().slice(0, 8),
+      'Composición': p.id,
+      Audio: String(p.audio || '').slice(0, 300),
+      'Quién': String(p.who || '').slice(0, 80),
+      Comentario: text,
+      Fecha: new Date().toISOString(),
+    };
+    // Un comentario que empieza con = + - @ se guarda como texto, nunca como fórmula.
+    compSheet('Comentarios').appendRow(COMMENT_HEADERS.map((h) => (/^[=+\-@]/.test(comment[h]) ? "'" + comment[h] : comment[h])));
+    log('Comentario', p.id, text.slice(0, 80), p.who);
+    return { ok: true, comment: comment };
+  },
+
+  deleteComment(p) {
+    const sheet = compSheet('Comentarios');
+    const row = findById(sheet, p.commentId);
+    if (!row) throw new Error('No encontré el comentario.');
+    sheet.deleteRow(row);
+    log('Borrar comentario', p.commentId, '', p.who);
+    return { ok: true };
   },
 
   /** Pasa una composición terminada al repertorio (RESUMEN y Letras). */

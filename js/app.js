@@ -148,13 +148,15 @@ function sourceBanner() {
   return `<div class="banner">${esc(msg)} <button class="link" data-action="reload">Reintentar</button></div>`;
 }
 
-function homeHeader(active) {
-  return `<header class="top home">
-      ${logo('brand', 'img/logo-negro.png', 'img/logo-blanco.png', 'Zamar Adoración')}
+const topBar = () => `<header class="top home">
+      <a href="#/" class="brandlink" aria-label="Inicio">${logo('brand', 'img/logo-negro.png', 'img/logo-blanco.png', 'Zamar Adoración')}</a>
       <button class="icon" data-action="reload" aria-label="Actualizar">⟳</button>
-    </header>
+    </header>`;
+
+function homeHeader(active) {
+  return `${topBar()}
     <nav class="nav">
-      <a href="#/" ${active === 'songs' ? 'aria-current="page"' : ''}>Canciones</a>
+      <a href="#/canciones" ${active === 'songs' ? 'aria-current="page"' : ''}>Canciones</a>
       <a href="#/sets" ${active === 'sets' ? 'aria-current="page"' : ''}>Setlists</a>
       ${
         canEdit()
@@ -179,6 +181,40 @@ const groupValues = {
   statuses: () => uniq(state.songs.map((s) => s.status)),
 };
 const GROUP_LABEL = { themes: 'Tema', voices: 'Voz principal', keys: 'Tono', statuses: 'Estatus' };
+
+// ---------- inicio ----------
+function renderHome() {
+  document.title = 'Zamar Adoración';
+  const sets = allSetlists();
+  const last = songById(store.get('zamar:last', ''));
+  const ready = state.songs.filter((s) => statusClass(s.status) === 'ok').length;
+  const tile = (href, icon, title, sub) =>
+    `<a class="tile" href="${href}"><span class="tile-icon" aria-hidden="true">${icon}</span><strong>${title}</strong><small>${esc(sub)}</small></a>`;
+  app.innerHTML = `
+    ${topBar()}
+    ${sourceBanner()}
+    <section class="hero">
+      <img src="img/equipo-800.jpg" srcset="img/equipo-800.jpg 800w, img/equipo.jpg 1400w" sizes="(max-width: 720px) 100vw, 720px" alt="El equipo de Zamar Adoración">
+      <div class="hero-text">
+        <strong>Todo lo que respira alabe al Señor</strong>
+        <small>Salmo 150, 6</small>
+      </div>
+    </section>
+    ${agenda?.nextBanner() || ''}
+    ${
+      last
+        ? `<a class="nextstrip" href="#/c/${encodeURIComponent(last.id)}"><span aria-hidden="true">🎵</span><span>Seguir con <strong>${esc(last.title)}</strong></span><span aria-hidden="true">›</span></a>`
+        : ''
+    }
+    <div class="tiles">
+      ${tile('#/canciones', '🎵', 'Canciones', `${state.songs.length} en el repertorio · ${ready} listas`)}
+      ${tile('#/sets', '📋', 'Setlists', sets.length ? `${sets.length} en este teléfono` : 'Arma el de tu próximo evento')}
+      ${canEdit() ? tile('#/agenda', '📅', 'Agenda', 'Eventos y quién va') : ''}
+      ${canEdit() ? tile('#/comp', '✍️', 'Composiciones', 'Ideas, audios y comentarios') : ''}
+      ${tile('#/puente', '🧭', 'Puente entre tonos', 'Cómo pasar de un tono a otro')}
+    </div>
+    <footer class="foot">${state.updatedAt ? `Actualizado ${esc(fmtDate(state.updatedAt))}` : ''}</footer>`;
+}
 
 // ---------- lista de canciones ----------
 function matches(s) {
@@ -250,7 +286,6 @@ function renderList() {
   app.innerHTML = `
     ${homeHeader('songs')}
     ${sourceBanner()}
-    ${agenda?.nextBanner() || ''}
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar canción o autor" value="${esc(f.q)}" autocomplete="off">
       <div class="row">
@@ -302,12 +337,13 @@ function renderSong(id, ctx = null, came = null) {
     ? backHeader(`#/set/${ctx.set.id}`, ctx.set.name)
     : fromSong
       ? backHeader(`#/c/${encodeURIComponent(fromSong.id)}`, fromSong.title)
-      : backHeader('#/', 'Repertorio');
+      : backHeader('#/canciones', 'Repertorio');
   if (!song) {
     app.innerHTML = `${back}<p class="empty">No encontré esta canción. Quizá cambió de nombre en la hoja.</p>`;
     return;
   }
   document.title = `${song.title} · Zamar`;
+  if (!ctx) store.set('zamar:last', song.id);
 
   // Tono base: el de Zamar o el original, a elección de cada quien.
   const hasBoth = Boolean(song.keyZamar && song.keyOriginal);
@@ -809,12 +845,13 @@ function route() {
     if (shared) return () => renderSetlist('', shared);
   }
   if (h === '#/sets') return renderSetlists;
+  if (h === '#/canciones') return renderList;
   if ((m = h.match(/^#\/puente(?:\/([^/]*))?(?:\/([^/]*))?$/)))
     return () => renderBridgePage(decodeURIComponent(m[1] || ''), decodeURIComponent(m[2] || ''));
-  return renderList;
+  return renderHome;
 }
 
-const isList = () => !location.hash || location.hash === '#/' || location.hash === '#';
+const isList = () => location.hash === '#/canciones';
 
 function render({ navigated = false } = {}) {
   const y = navigated ? (isList() ? state.listScroll || 0 : 0) : window.scrollY;

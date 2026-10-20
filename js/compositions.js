@@ -11,7 +11,7 @@ const MAX_AUDIO = 25 * 1024 * 1024;
 export function setupCompositions(ctx) {
   const { app, store, esc, backHeader, homeHeader, loadSongs } = ctx;
   const { api, who } = setupApi(store);
-  const data = { items: null, audios: [], error: '' };
+  const data = { items: null, audios: [], comments: [], error: '' };
   const shifts = {}; // transposición por composición, solo mientras la app está abierta
 
   const toComp = (r) => ({
@@ -32,6 +32,7 @@ export function setupCompositions(ctx) {
       const res = await api('listCompositions');
       data.items = res.items.map(toComp).filter((c) => c.id && c.title);
       data.audios = res.audios;
+      data.comments = res.comments || [];
       data.error = '';
     } catch (err) {
       data.error = err.message;
@@ -41,6 +42,12 @@ export function setupCompositions(ctx) {
   const byId = (id) => data.items?.find((c) => c.id === id);
   const audiosOf = (id) =>
     data.audios.filter((a) => String(a['Composición']) === id).sort((a, b) => String(b.Fecha).localeCompare(String(a.Fecha)));
+
+  // Comentarios generales (sin audio) o de un audio en particular, del más viejo al más nuevo.
+  const commentsOf = (id, audio = '') =>
+    data.comments
+      .filter((m) => String(m['Composición']) === id && String(m.Audio || '') === audio)
+      .sort((a, b) => String(a.Fecha).localeCompare(String(b.Fecha)));
 
   const fmt = (iso) => {
     const d = new Date(iso);
@@ -88,10 +95,11 @@ export function setupCompositions(ctx) {
               ? items
                   .map((c) => {
                     const n = audiosOf(c.id).length;
+                    const k = data.comments.filter((m) => String(m['Composición']) === c.id).length;
                     return `<a class="song" href="#/comp/${encodeURIComponent(c.id)}">
                       <span class="song-main">
                         <span class="song-title">${esc(c.title)}</span>
-                        <span class="song-sub">${esc(c.authors || 'Sin autores')} · ${esc(c.stage)}${n ? ` · ${n} audio${n > 1 ? 's' : ''}` : ''}</span>
+                        <span class="song-sub">${esc(c.authors || 'Sin autores')} · ${esc(c.stage)}${n ? ` · ${n} audio${n > 1 ? 's' : ''}` : ''}${k ? ` · 💬 ${k}` : ''}</span>
                       </span>
                       <span class="song-meta">
                         ${c.key ? `<span class="key">${esc(keyName(c.key))}</span>` : ''}
@@ -168,6 +176,7 @@ export function setupCompositions(ctx) {
                           </div>
                           ${fid ? `<audio controls preload="none" src="https://drive.google.com/uc?export=download&id=${esc(fid)}"></audio>` : ''}
                           ${/^https:\/\//.test(a.Link) ? `<a class="hint" href="${esc(a.Link)}" target="_blank" rel="noopener">Abrir en Drive</a>` : ''}
+                          ${thread(c.id, String(a.Link || ''), 'Comenta este audio')}
                         </li>`;
                       })
                       .join('')
@@ -194,6 +203,11 @@ export function setupCompositions(ctx) {
 
           ${c.notes ? `<section><h2>Notas</h2><p class="teamnotes">${esc(c.notes)}</p></section>` : ''}
 
+          <section>
+            <h2>Comentarios del equipo</h2>
+            ${thread(c.id, '', '¿Qué te parece la canción? Letra, melodía, ideas…', true)}
+          </section>
+
           ${
             c.stage === 'Terminada'
               ? `<section><button class="primary" data-action="promote">Pasar al repertorio</button>
@@ -217,6 +231,7 @@ export function setupCompositions(ctx) {
         }),
       );
       setupAudio(c);
+      setupComments(c);
       app.querySelector('[data-action="promote"]')?.addEventListener('click', async (e) => {
         if (!confirm(`¿Agregar “${c.title}” al repertorio?`)) return;
         e.target.disabled = true;
@@ -233,6 +248,62 @@ export function setupCompositions(ctx) {
         }
       });
     });
+  }
+
+  // ---------- comentarios ----------
+  /** Lista de comentarios con su caja para escribir. Plegada en cada audio, abierta en la general. */
+  function thread(id, audio, placeholder, open = false) {
+    const list = commentsOf(id, audio);
+    const body = `<ul class="comments">${list
+      .map(
+        (m) => `<li>
+          <div class="comment-head"><strong>${esc(m['Quién'] || 'Alguien')}</strong><small>${esc(fmt(m.Fecha))}</small>
+            ${m.ID ? `<button class="link" data-uncomment="${esc(m.ID)}" aria-label="Borrar comentario">✕</button>` : ''}</div>
+          <p>${esc(m.Comentario)}</p>
+        </li>`,
+      )
+      .join('')}</ul>
+      <form class="commentform" data-audio="${esc(audio)}">
+        <textarea name="text" rows="2" placeholder="${esc(placeholder)}" required></textarea>
+        <button type="submit">Enviar</button>
+      </form>`;
+    if (open) return body;
+    return `<details class="thread" ><summary>💬 ${list.length ? `${list.length} comentario${list.length > 1 ? 's' : ''}` : 'Comentar'}</summary>${body}</details>`;
+  }
+
+  function setupComments(c) {
+    app.querySelectorAll('.commentform').forEach((form) =>
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = form.elements.text.value.trim();
+        if (!text) return;
+        const button = form.querySelector('button');
+        button.disabled = true;
+        try {
+          const { comment } = await api('addComment', { id: c.id, audio: form.dataset.audio, text });
+          data.comments.push(comment);
+          const open = [...app.querySelectorAll('details.thread')].map((d) => d.open);
+          renderOne(c.id);
+          // Deja abiertos los hilos que estaban abiertos.
+          app.querySelectorAll('details.thread').forEach((d, i) => (d.open = open[i] || false));
+        } catch (err) {
+          alert(err.message);
+          button.disabled = false;
+        }
+      }),
+    );
+    app.querySelectorAll('[data-uncomment]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        if (!confirm('¿Borrar este comentario?')) return;
+        try {
+          await api('deleteComment', { commentId: b.dataset.uncomment });
+          data.comments = data.comments.filter((m) => m.ID !== b.dataset.uncomment);
+          renderOne(c.id);
+        } catch (err) {
+          alert(err.message);
+        }
+      }),
+    );
   }
 
   // ---------- grabar o subir audio ----------

@@ -28,8 +28,9 @@ test('dibuja secciones y transpone sin tocar los tabs', () => {
   const html = renderChordSheet(CHO, 2, false);
   assert.match(html, /<span class="section">Verso 1<\/span>/);
   assert.match(html, /class="block chorus"><span class="section">Coro<\/span>/);
-  assert.match(html, /<span class="chord">A<\/span><span>Primera <\/span>/);
-  assert.match(html, /<span class="chord">D<\/span><span>Coro aquí<\/span>/);
+  assert.match(html, /<span class="chord">A<\/span><span>Primera<\/span><\/span><\/span> /);
+  // Cada palabra va junta, pero el renglón se puede partir entre palabras.
+  assert.match(html, /<span class="w"><span class="cp"><span class="chord">D<\/span><span>Coro<\/span><\/span><\/span> aquí/);
   assert.match(html, /e\|---3---2---\|/);
   assert.doesNotMatch(html, /Canción de prueba/);
 });

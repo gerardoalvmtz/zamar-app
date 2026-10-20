@@ -8,6 +8,7 @@ import {
   saveSetlist,
   createSetlist,
   deleteSetlist,
+  duplicateSetlist,
   addToSetlist,
   encodeSetlist,
   decodeSetlist,
@@ -722,6 +723,7 @@ function renderSetlist(id, shared = null) {
               ${rows.length ? `<a class="button" href="#/set/${set.id}/0">Tocar</a>` : ''}
               <button data-action="share">Compartir link</button>
               ${rows.length ? '<button data-action="image">🖼 Imagen</button><button data-action="pdf">📄 PDF con letras</button>' : ''}
+              <button data-action="duplicate">Duplicar</button>
               <button class="danger" data-action="delete">Borrar</button>
             </div>
             <p class="hint" id="sharemsg"></p>`
@@ -778,6 +780,10 @@ function renderSetlist(id, shared = null) {
     });
   fileAction('image', 'la imagen', setlistImage, 'png', 'image/png');
   fileAction('pdf', 'el PDF', setlistPdf, 'pdf', 'application/pdf');
+  app.querySelector('[data-action="duplicate"]').addEventListener('click', () => {
+    const copy = duplicateSetlist(set.id);
+    if (copy) location.hash = `#/set/${copy.id}`;
+  });
   app.querySelector('[data-action="delete"]').addEventListener('click', () => {
     if (!confirm(`¿Borrar “${set.name}” de este teléfono?`)) return;
     deleteSetlist(set.id);

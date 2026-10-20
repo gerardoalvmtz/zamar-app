@@ -57,7 +57,9 @@ transponen al cambiar el tono.
 - Setlists para eventos, del equipo: con el programa de Apps Script se guardan en la hoja privada y todos los ven;
   verlos, crearlos y editarlos no pide PIN, borrarlos sí. Se arman buscando la canción por nombre o por tema y eligiendo el tono
   (el de Zamar por defecto). Se comparten con un link, como imagen PNG (canciones, tonos y BPM) o como PDF con
-  las letras, una canción por página. **Duplicar** copia un setlist con sus tonos para reutilizarlo. El PDF usa [jsPDF](https://github.com/parallax/jsPDF) (MIT, en `js/vendor/`).
+  las letras, una canción por página. **Duplicar** copia un setlist con sus tonos para reutilizarlo.
+  **QR con letras** sube a Drive un PDF solo con las letras (sin tonos ni BPM) y muestra su QR para proyectarlo o
+  imprimirlo; todos los PDF llevan el link al Linktree de Zamar. El PDF usa [jsPDF](https://github.com/parallax/jsPDF) (MIT, en `js/vendor/`).
 
 ## Editar desde la app
 

@@ -1,12 +1,15 @@
 // Archivos para compartir un setlist: una imagen PNG con el resumen (canciones, tonos y BPM)
 // y un PDF con las letras. Todo se genera en el teléfono, sin servidor.
 
+export const LINKTREE = 'https://linktr.ee/zamaradoracion';
+const LINKTREE_TEXT = 'linktr.ee/zamaradoracion';
+
 const longDay = (iso) =>
   iso
     ? new Date(iso + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : '';
 
-const fileName = (set, ext) =>
+export const fileName = (set, ext) =>
   `${(set.name || 'setlist')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -149,7 +152,10 @@ const plain = (t) =>
  * PDF con la lista y la letra de cada canción. `rows` = [{ title, author, key, bpm, lyrics }],
  * donde los títulos de sección vienen como [[Coro]]. Devuelve un Blob.
  */
-export async function setlistPdf(set, rows) {
+export async function setlistPdf(set, rows, { audience = false } = {}) {
+  // Para la asamblea (el PDF del QR) no van tono ni BPM: solo letras.
+  const meta = (r, withAuthor) =>
+    [withAuthor && r.author, !audience && r.key && `Tono ${r.key}`, !audience && r.bpm && `${r.bpm} BPM`].filter(Boolean).join(' · ');
   const JsPDF = await loadJsPdf();
   const doc = new JsPDF({ unit: 'pt', format: 'letter' });
   const W = doc.internal.pageSize.getWidth();
@@ -182,9 +188,17 @@ export async function setlistPdf(set, rows) {
     doc.text(`${i + 1}.`, M, y);
     doc.text(plain(r.title), M + 22, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(plain([r.key && `Tono ${r.key}`, r.bpm && `${r.bpm} BPM`].filter(Boolean).join(' · ')), W - M, y, { align: 'right' });
+    doc.text(plain(meta(r, audience)), W - M, y, { align: 'right' });
     y += 22;
   });
+  ensure(60);
+  y += 24;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(110);
+  doc.text('Síguenos y escucha nuestra música:', M, y);
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'bold');
+  doc.textWithLink(LINKTREE_TEXT, M, y + 18, { url: LINKTREE });
 
   // Una canción por página.
   rows.forEach((r, i) => {
@@ -197,8 +211,8 @@ export async function setlistPdf(set, rows) {
     doc.setFontSize(11);
     doc.setTextColor(110);
     y += 20;
-    const meta = [r.author, r.key && `Tono ${r.key}`, r.bpm && `${r.bpm} BPM`].filter(Boolean).join(' · ');
-    if (meta) doc.text(plain(meta), M, y);
+    const info = meta(r, true);
+    if (info) doc.text(plain(info), M, y);
     doc.setTextColor(0);
     y += 26;
     doc.setFontSize(12);
@@ -250,13 +264,86 @@ export async function setlistPdf(set, rows) {
     doc.setPage(p);
     doc.text(plain(`${set.name || 'Setlist'} · Zamar Adoración`), M, H - 28);
     doc.text(`${p} / ${pages}`, W - M, H - 28, { align: 'right' });
+    doc.textWithLink(LINKTREE_TEXT, W / 2 - doc.getTextWidth(LINKTREE_TEXT) / 2, H - 28, { url: LINKTREE });
   }
   return doc.output('blob');
 }
 
+let qrReady = null;
+function loadQr() {
+  qrReady ||= new Promise((resolve, reject) => {
+    if (window.qrcode) return resolve(window.qrcode);
+    const s = document.createElement('script');
+    s.src = 'js/vendor/qrcode.js';
+    s.onload = () => resolve(window.qrcode);
+    s.onerror = () => {
+      qrReady = null;
+      reject(new Error('No se pudo cargar el generador de QR. Revisa tu conexión.'));
+    };
+    document.head.appendChild(s);
+  });
+  return qrReady;
+}
+
+/** Dibuja el QR de un link en un canvas, con margen blanco alrededor. */
+export async function qrCanvas(text, size = 600) {
+  const qrcode = await loadQr();
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  const cell = Math.floor(size / (n + 8));
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = cell * (n + 8);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#121212';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect((c + 4) * cell, (r + 4) * cell, cell, cell);
+  return canvas;
+}
+
+/** Imagen lista para proyectar o mandar: nombre del setlist, QR grande y el Linktree. */
+export async function qrPoster(set, url) {
+  const W = 1080;
+  const H = 1350;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
+  const sans = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillStyle = '#faf9f7';
+  ctx.fillRect(0, 0, W, H);
+  const logo = await loadImage('img/logo-negro.png');
+  if (logo) {
+    const h = 80;
+    const w = (logo.width / logo.height) * h;
+    ctx.drawImage(logo, (W - w) / 2, 70, w, h);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#121212';
+  ctx.font = `600 60px ${serif}`;
+  ctx.fillText(fit(ctx, set.name || 'Setlist', W - 120), W / 2, 250);
+  const day = longDay(set.date);
+  ctx.fillStyle = '#6d6a66';
+  ctx.font = `34px ${sans}`;
+  if (day) ctx.fillText(day.charAt(0).toUpperCase() + day.slice(1), W / 2, 305);
+  const qr = await qrCanvas(url, 700);
+  const s = 700;
+  ctx.drawImage(qr, (W - s) / 2, 360, s, s);
+  ctx.fillStyle = '#121212';
+  ctx.font = `600 42px ${sans}`;
+  ctx.fillText('Escanea para ver las letras', W / 2, 1140);
+  ctx.fillStyle = '#6d6a66';
+  ctx.font = `32px ${sans}`;
+  ctx.fillText(`Síguenos: ${LINKTREE_TEXT}`, W / 2, 1210);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
 /** Comparte un archivo con la hoja del teléfono; si no se puede, lo descarga. */
-export async function shareFile(blob, set, ext, mime) {
-  const name = fileName(set, ext);
+export async function shareFile(blob, set, ext, mime, suffix = '') {
+  const name = fileName(set, ext).replace(/\.(\w+)$/, `${suffix}.$1`);
   const file = new File([blob], name, { type: mime });
   if (navigator.canShare?.({ files: [file] })) {
     try {

@@ -125,6 +125,7 @@ export function rowsToSongs(rows) {
       link: get(row, 'link'),
       spotify: get(row, 'spotify'),
       tabs: '',
+      files: [],
     });
   }
   return songs;
@@ -145,14 +146,31 @@ export function rowsToTexts(rows) {
   const lyrics = col(['letra', 'lyrics']);
   const chords = col(['acordes', ...COLUMNS.chords]);
   const tabs = col(['tabs', 'tablaturas', 'tab', 'guitarra electrica']);
-  if (title < 0 || (lyrics < 0 && chords < 0 && tabs < 0)) return texts;
+  const files = col(['archivos', 'adjuntos']);
+  if (title < 0 || (lyrics < 0 && chords < 0 && tabs < 0 && files < 0)) return texts;
   const cell = (row, i) => (i < 0 ? '' : String(row[i] ?? '').trim());
   for (const row of rows.slice(1)) {
     const t = normalize(row[title]);
     if (!t) continue;
-    texts.set(t, { lyrics: cell(row, lyrics), chords: cell(row, chords), tabs: cell(row, tabs) });
+    texts.set(t, {
+      lyrics: cell(row, lyrics),
+      chords: cell(row, chords),
+      tabs: cell(row, tabs),
+      files: parseFiles(cell(row, files)),
+    });
   }
   return texts;
+}
+
+/** Celda "Archivos": una línea por archivo, "nombre | link". */
+export function parseFiles(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => {
+      const m = line.match(/^(.*?)\s*\|\s*(https?:\/\/\S+)\s*$/);
+      return m ? { name: m[1] || 'Archivo', url: m[2] } : null;
+    })
+    .filter(Boolean);
 }
 
 /** Completa letra y acordes de cada canción con lo que haya en la pestaña "Letras". */
@@ -163,6 +181,7 @@ export function attachTexts(songs, texts) {
     song.lyrics = song.lyrics || t.lyrics;
     song.chords = song.chords || t.chords;
     song.tabs = song.tabs || t.tabs;
+    song.files = t.files;
   }
   return songs;
 }

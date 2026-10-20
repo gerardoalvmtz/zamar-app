@@ -11,3 +11,7 @@ export const LYRICS_GID = '1658370148'; // Letras
 
 export const sheetCsvUrl = (gid = MAIN_GID) =>
   `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&gid=${encodeURIComponent(gid)}`;
+
+// Link del programa de Apps Script que guarda los cambios hechos desde la app
+// (ver apps-script/LEEME.md). Mientras esté vacío, la app es solo de lectura.
+export const WRITE_URL = '';

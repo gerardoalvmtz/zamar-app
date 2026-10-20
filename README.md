@@ -13,7 +13,7 @@ La hoja debe estar compartida como **"Cualquier persona con el enlace: Lector"**
 app muestra la copia guardada en el teléfono (o la incluida en `data/repertorio.json`) y avisa con un
 letrero amarillo.
 
-Otras columnas como "Acordes actualizados (Songbook)" son de control interno y la app no las muestra.
+Otras columnas como "Acordes actualizados (Songbook)" o "Lyrics ProPresenter" son de control interno y la app no las muestra.
 
 Columnas que la app reconoce (por nombre, en cualquier orden; las demás se ignoran):
 
@@ -24,28 +24,35 @@ Columnas que la app reconoce (por nombre, en cualquier orden; las demás se igno
 | Temas | Varios separados con ` / `. Se vuelven filtros |
 | Voz Principal | Hombre / Mujer / Ambos |
 | Católica? | Sí / No |
-| Tonalidad | `G`, `Bb`, `F#m`, `Em`... También acepta `Sol`, `Re menor` |
+| Tonalidad Original | `G`, `Bb`, `F#m`, `Em`... También acepta `Sol`, `Re menor` |
+| Tonalidad Zamar | La que toca el ministerio. Si está, es la que se usa por defecto |
 | BPM | Número |
 | Estatus | Lista para tocar / Pendiente repaso / ... |
-| Lyrics ProPresenter | Sí / No |
+| Spotify | Link de la canción en Spotify (se muestra el reproductor) |
 | Notas | *(opcional)* Notas del equipo, visibles para todos |
 | Link | *(opcional)* Video de referencia |
 
 ### Letras y hojas de acordes
 
 Van en una pestaña aparte llamada **Letras** dentro de la misma hoja, para que la pestaña principal
-siga siendo fácil de leer. Columnas: **Canción** (igual que en la pestaña principal), **Letra** y **Acordes**.
-En la app, cada canción tiene dos pestañas, *Letra* y *Acordes*. Los acordes se pueden escribir entre
+siga siendo fácil de leer. Columnas: **Canción** (igual que en la pestaña principal), **Letra**, **Acordes** y **Tabs**.
+En la app, cada canción tiene las pestañas *Letra*, *Acordes* y, si hay, *Tabs*.
+
+**Desde Songbook Pro:** exporta la canción como `.cho` (ChordPro), ábrela como texto y pega todo en la columna
+*Acordes*. La app entiende las secciones (`{soc}`, `{start_of_verse}`...), los tabs (`{sot}`...`{eot}`) y la
+tonalidad en que está escrita (`{key: G}`), y saca la letra sola si la columna *Letra* está vacía. Si la hoja no
+trae `{key}`, se asume que está en la Tonalidad Zamar. Los acordes se pueden escribir entre
 corchetes dentro de la letra (`[G]Santo es el [D]Señor`) o en una línea encima de la letra, y se
 transponen al cambiar el tono.
 
 ## Qué hace
 
-- Buscar por título o autor y filtrar por tema, tono, estatus y canciones católicas.
+- Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
   el BPM y el tema.
 - Notas personales que se guardan solo en el teléfono de cada quien.
+- Setlists para eventos: se arman en el teléfono, cada canción con su tono, y se comparten con un link.
 
 ## Publicarla (GitHub Pages, gratis)
 

@@ -62,14 +62,15 @@ const COLUMNS = {
   themes: ['temas', 'tema', 'genero', 'generos', 'categoria'],
   catholic: ['catolica'],
   voice: ['voz principal', 'voz'],
-  key: ['tonalidad', 'tono', 'key'],
+  keyOriginal: ['tonalidad original', 'tono original', 'tonalidad', 'tono', 'key'],
+  keyZamar: ['tonalidad zamar', 'tono zamar'],
   bpm: ['bpm', 'tempo'],
   status: ['estatus', 'estado'],
-  propresenter: ['lyrics propresenter', 'letra propresenter'],
   chords: ['letra y acordes', 'acordes y letra', 'chordpro', 'cifrado'],
   lyrics: ['letra', 'lyrics'],
   notes: ['notas', 'comentarios', 'anotaciones'],
   link: ['link', 'enlace', 'youtube', 'video'],
+  spotify: ['spotify', 'link spotify', 'enlace spotify'],
 };
 
 function columnIndex(headers) {
@@ -99,7 +100,8 @@ export function rowsToSongs(rows) {
     const n = (seen.get(id) || 0) + 1;
     seen.set(id, n);
     if (n > 1) id += '-' + n;
-    const keyText = get(row, 'key');
+    const keyOriginal = parseKey(get(row, 'keyOriginal'));
+    const keyZamar = parseKey(get(row, 'keyZamar'));
     const bpm = parseFloat(get(row, 'bpm').replace(',', '.'));
     songs.push({
       id,
@@ -111,15 +113,18 @@ export function rowsToSongs(rows) {
         .filter(Boolean),
       catholic: yes(get(row, 'catholic')),
       voice: get(row, 'voice'),
-      keyText,
-      key: parseKey(keyText),
+      keyOriginal,
+      keyZamar,
+      // La que el ministerio toca: la de Zamar si existe, si no la original.
+      key: keyZamar || keyOriginal,
       bpm: Number.isFinite(bpm) && bpm > 0 ? Math.round(bpm) : null,
       status: get(row, 'status'),
-      propresenter: yes(get(row, 'propresenter')),
       chords: get(row, 'chords'),
       lyrics: get(row, 'lyrics'),
       notes: get(row, 'notes'),
       link: get(row, 'link'),
+      spotify: get(row, 'spotify'),
+      tabs: '',
     });
   }
   return songs;
@@ -139,14 +144,13 @@ export function rowsToTexts(rows) {
   const title = col(COLUMNS.title);
   const lyrics = col(['letra', 'lyrics']);
   const chords = col(['acordes', ...COLUMNS.chords]);
-  if (title < 0 || (lyrics < 0 && chords < 0)) return texts;
+  const tabs = col(['tabs', 'tablaturas', 'tab', 'guitarra electrica']);
+  if (title < 0 || (lyrics < 0 && chords < 0 && tabs < 0)) return texts;
+  const cell = (row, i) => (i < 0 ? '' : String(row[i] ?? '').trim());
   for (const row of rows.slice(1)) {
     const t = normalize(row[title]);
     if (!t) continue;
-    texts.set(t, {
-      lyrics: lyrics < 0 ? '' : String(row[lyrics] ?? '').trim(),
-      chords: chords < 0 ? '' : String(row[chords] ?? '').trim(),
-    });
+    texts.set(t, { lyrics: cell(row, lyrics), chords: cell(row, chords), tabs: cell(row, tabs) });
   }
   return texts;
 }
@@ -158,6 +162,7 @@ export function attachTexts(songs, texts) {
     if (!t) continue;
     song.lyrics = song.lyrics || t.lyrics;
     song.chords = song.chords || t.chords;
+    song.tabs = song.tabs || t.tabs;
   }
   return songs;
 }

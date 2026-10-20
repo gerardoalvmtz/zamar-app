@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseCsv, rowsToSongs, suggestions } from '../js/songs.js';
-import { parseKey } from '../js/music.js';
+import { parseKey, keyName } from '../js/music.js';
 
 test('parsea CSV con comillas, comas y saltos de línea', () => {
   const rows = parseCsv('a,b\n"x, y","línea 1\nlínea 2"\n"dice ""hola""",z');
@@ -16,7 +16,7 @@ test('lee el repertorio por nombre de columna', () => {
   const s = songs.find((x) => x.title === 'Aún en medio del dolor');
   assert.deepEqual(s.themes, ['Reflexión', 'Sanación', 'Heridas']);
   assert.equal(s.catholic, false);
-  assert.equal(s.keyText, 'D');
+  assert.equal(keyName(s.key), 'D');
   assert.equal(s.status, 'Pendiente repaso');
   assert.equal(new Set(songs.map((x) => x.id)).size, songs.length);
 });
@@ -63,4 +63,17 @@ test('toma letra y acordes de la pestaña "Letras"', async () => {
 test('lee la voz principal', () => {
   const songs = rowsToSongs([['Canción', 'Voz Principal'], ['Entraré', 'Ambos']]);
   assert.equal(songs[0].voice, 'Ambos');
+});
+
+test('distingue tonalidad original y de Zamar', () => {
+  const [a, b] = rowsToSongs([
+    ['Canción', 'Tonalidad Original', 'Tonalidad Zamar'],
+    ['Con las dos', 'G', 'A'],
+    ['Solo original', 'Em', ''],
+  ]);
+  assert.equal(keyName(a.keyOriginal), 'G');
+  assert.equal(keyName(a.keyZamar), 'A');
+  assert.equal(keyName(a.key), 'A');
+  assert.equal(keyName(b.key), 'Em');
+  assert.equal(b.keyZamar, null);
 });

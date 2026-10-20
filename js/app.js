@@ -1,4 +1,4 @@
-import { sheetCsvUrl, LYRICS_SHEET_NAME } from './config.js';
+import { sheetCsvUrl, LYRICS_GID } from './config.js';
 import { parseCsv, rowsToSongs, rowsToTexts, attachTexts, suggestions, normalize } from './songs.js';
 import {
   keyName,
@@ -39,11 +39,11 @@ const store = {
 };
 
 // ---------- datos ----------
-async function fetchSheet(name) {
+async function fetchSheet(gid) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const res = await fetch(sheetCsvUrl(name), { signal: ctrl.signal, cache: 'no-store' });
+    const res = await fetch(sheetCsvUrl(gid), { signal: ctrl.signal, cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     // Si la hoja no es pública, Google responde con una página de inicio de sesión.
@@ -60,7 +60,7 @@ async function loadSongs({ quiet = false } = {}) {
   try {
     const [rows, textRows] = await Promise.all([
       fetchSheet(),
-      fetchSheet(LYRICS_SHEET_NAME).catch(() => null), // la pestaña de letras es opcional
+      fetchSheet(LYRICS_GID).catch(() => null), // la pestaña de letras es opcional
     ]);
     state.songs = attachTexts(rowsToSongs(rows), rowsToTexts(textRows));
     state.source = 'live';
@@ -253,6 +253,7 @@ function renderSong(id) {
       <p class="chips">
         ${song.themes.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
         ${song.catholic ? '<span class="chip catholic">Católica</span>' : ''}
+        ${song.voice ? `<span class="chip">Voz: ${esc(song.voice)}</span>` : ''}
         ${song.propresenter ? '<span class="chip">Letra en ProPresenter</span>' : ''}
       </p>
       <p class="status"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}</p>

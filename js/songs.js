@@ -61,6 +61,7 @@ const COLUMNS = {
   author: ['autor', 'artista', 'interprete'],
   themes: ['temas', 'tema', 'genero', 'generos', 'categoria'],
   catholic: ['catolica'],
+  voice: ['voz principal', 'voz'],
   key: ['tonalidad', 'tono', 'key'],
   bpm: ['bpm', 'tempo'],
   status: ['estatus', 'estado'],
@@ -109,6 +110,7 @@ export function rowsToSongs(rows) {
         .map((t) => t.trim())
         .filter(Boolean),
       catholic: yes(get(row, 'catholic')),
+      voice: get(row, 'voice'),
       keyText,
       key: parseKey(keyText),
       bpm: Number.isFinite(bpm) && bpm > 0 ? Math.round(bpm) : null,

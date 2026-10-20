@@ -54,7 +54,8 @@ transponen al cambiar el tono.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
   el BPM y el tema.
 - Notas personales que se guardan solo en el teléfono de cada quien.
-- Setlists para eventos: se arman en el teléfono buscando la canción por nombre o por tema y eligiendo el tono
+- Setlists para eventos, del equipo: con el programa de Apps Script se guardan en la hoja privada y todos los ven;
+  verlos, crearlos y editarlos no pide PIN, borrarlos sí. Se arman buscando la canción por nombre o por tema y eligiendo el tono
   (el de Zamar por defecto). Se comparten con un link, como imagen PNG (canciones, tonos y BPM) o como PDF con
   las letras, una canción por página. **Duplicar** copia un setlist con sus tonos para reutilizarlo. El PDF usa [jsPDF](https://github.com/parallax/jsPDF) (MIT, en `js/vendor/`).
 

@@ -734,3 +734,9 @@ details.thread summary{cursor:pointer;font-size:.9rem;opacity:.85}
 .addkey { padding: 0 12px 12px; align-items: end; }
 .addkey label { flex: 1; display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
 .actions { flex-wrap: wrap; }
+
+/* Setlists del equipo y los que solo están en el teléfono */
+.setgroup { margin: 26px 0 4px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.setcard { display: flex; align-items: center; gap: 10px; }
+.setcard .song-main { flex: 1; min-width: 0; color: inherit; text-decoration: none; display: grid; }
+.setcard button { flex: none; }

@@ -28,10 +28,15 @@ const RSVP_HEADERS = ['Evento', 'Quién', 'Respuesta', 'Rol', 'Fecha'];
 const RSVP_ANSWERS = ['Voy', 'Tal vez', 'No puedo'];
 // Comentarios del equipo sobre una composición o sobre uno de sus audios (Audio = link del audio).
 const COMMENT_HEADERS = ['ID', 'Composición', 'Audio', 'Quién', 'Comentario', 'Fecha'];
+// Setlists del equipo. Canciones = JSON con [id de canción, tono] en orden.
+const SETLIST_HEADERS = ['ID', 'Nombre', 'Fecha', 'Canciones', 'Creado', 'Actualizado', 'Quién'];
+const MAX_SETLIST_SONGS = 60;
 const PRIVATE_TABS = {
   Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Comentarios: COMMENT_HEADERS,
-  Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS,
+  Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS, Setlists: SETLIST_HEADERS,
 };
+// Acciones que no piden PIN: ver, crear y editar setlists (borrarlos sí lo pide).
+const OPEN_ACTIONS = ['listSetlists', 'saveSetlist'];
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -400,6 +405,53 @@ const ACTIONS = {
     return { ok: true };
   },
 
+  // ---------- setlists ----------
+  listSetlists() {
+    const sets = records(compSheet('Setlists')).map((r) => {
+      let items = [];
+      try {
+        items = JSON.parse(String(r.Canciones || '[]'));
+      } catch (ignored) {}
+      items = (Array.isArray(items) ? items : []).map((x) => ({ id: String(x[0] || ''), key: String(x[1] || '') }));
+      return { id: String(r.ID), name: String(r.Nombre || ''), date: String(r.Fecha || '').slice(0, 10), items: items };
+    });
+    return { ok: true, setlists: sets.filter((x) => x.id) };
+  },
+
+  saveSetlist(p) {
+    const id = String(p.id || '');
+    if (!/^s[a-z0-9]{6,20}$/.test(id)) throw new Error('Setlist no válido.');
+    const items = (Array.isArray(p.items) ? p.items : []).slice(0, MAX_SETLIST_SONGS).map((x) => [
+      String((x && x.id) || '').slice(0, 120),
+      String((x && x.key) || '').slice(0, 6),
+    ]);
+    const name = String(p.name || 'Setlist').trim().slice(0, 100) || 'Setlist';
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(p.date || '')) ? String(p.date) : '';
+    const sheet = compSheet('Setlists');
+    let row = findById(sheet, id);
+    const now = new Date();
+    if (!row) {
+      row = sheet.getLastRow() + 1;
+      sheet.getRange(row, column(sheet, 'ID', true)).setValue(id);
+      sheet.getRange(row, column(sheet, 'Creado', true)).setValue(now);
+    }
+    const values = { Nombre: name, Fecha: date, Canciones: JSON.stringify(items), 'Quién': String(p.who || '').slice(0, 80) };
+    // Todo como texto: un nombre que empiece con = no se vuelve fórmula y la fecha no cambia de zona.
+    Object.keys(values).forEach((h) => sheet.getRange(row, column(sheet, h, true)).setValue(values[h] ? "'" + values[h] : ''));
+    sheet.getRange(row, column(sheet, 'Actualizado', true)).setValue(now);
+    return { ok: true, id: id };
+  },
+
+  deleteSetlist(p) {
+    const sheet = compSheet('Setlists');
+    const row = findById(sheet, p.id);
+    if (!row) return { ok: true };
+    const name = records(sheet)[row - 2].Nombre;
+    sheet.deleteRow(row);
+    log('Borrar setlist', name, '', p.who);
+    return { ok: true };
+  },
+
   /** Quién va a un evento. Una fila por persona; respuesta vacía la quita. */
   rsvp(p) {
     if (!findById(compSheet('Eventos'), p.id)) throw new Error('No encontré el evento.');
@@ -432,9 +484,11 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
     const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const pin = PropertiesService.getScriptProperties().getProperty('PIN');
-    if (!pin) throw new Error('Todavía no hay PIN. En la hoja usa el menú Zamar → Cambiar PIN de edición.');
-    if (String(p.pin || '') !== pin) throw new Error('PIN incorrecto.');
+    if (OPEN_ACTIONS.indexOf(p.action) < 0) {
+      const pin = PropertiesService.getScriptProperties().getProperty('PIN');
+      if (!pin) throw new Error('Todavía no hay PIN. En la hoja usa el menú Zamar → Cambiar PIN de edición.');
+      if (String(p.pin || '') !== pin) throw new Error('PIN incorrecto.');
+    }
     const action = ACTIONS[p.action];
     if (!action) throw new Error('Acción desconocida.');
     lock.waitLock(20000);

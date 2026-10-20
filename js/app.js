@@ -9,12 +9,16 @@ import {
   createSetlist,
   deleteSetlist,
   duplicateSetlist,
+  uploadSetlist,
   addToSetlist,
   encodeSetlist,
   decodeSetlist,
   importSetlist,
+  useTeam,
+  teamMode,
+  refreshTeam,
 } from './setlists.js';
-import { canEdit } from './api.js';
+import { canEdit, setupApi } from './api.js';
 import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
@@ -612,29 +616,54 @@ function renderSetlists() {
         <button type="submit">Crear</button>
       </div>
     </form>
-    <div class="list">
-      ${
-        sets.length
-          ? sets
-              .map(
-                (s) => `<a class="song" href="#/set/${s.id}">
-                  <span class="song-main">
-                    <span class="song-title">${esc(s.name)}</span>
-                    <span class="song-sub">${esc(fmtDay(s.date) || 'Sin fecha')} · ${s.items.length} canciones</span>
-                  </span>
-                </a>`,
-              )
-              .join('')
-          : '<p class="empty">Todavía no hay setlists en este teléfono.</p>'
-      }
-    </div>
-    <p class="hint">Los setlists se guardan en este teléfono. Para pasarlos al equipo usa “Compartir”.</p>
+    ${setGroup(sets.filter((s) => !s.local), teamMode() ? 'Del equipo' : '', teamMode() ? 'Todavía no hay setlists del equipo.' : 'Todavía no hay setlists en este teléfono.')}
+    ${
+      teamMode() && sets.some((s) => s.local)
+        ? `<h2 class="setgroup">Solo en este teléfono</h2>
+           <p class="hint">Los armaste antes de que los setlists fueran del equipo. Súbelos para que todos los vean.</p>
+           ${setGroup(sets.filter((s) => s.local), '', '', true)}`
+        : ''
+    }
+    <p class="hint">${
+      teamMode()
+        ? 'Los setlists los ve todo el equipo y cualquiera los puede editar; borrarlos pide el PIN.'
+        : 'Los setlists se guardan en este teléfono. Para pasarlos al equipo usa “Compartir”.'
+    }</p>
     <a class="button ghost bridgelink" href="#/puente">🧭 Puente entre dos tonos</a>`;
+  app.querySelectorAll('[data-upload]').forEach((b) =>
+    b.addEventListener('click', () => {
+      uploadSetlist(b.dataset.upload);
+      renderSetlists();
+    }),
+  );
   app.querySelector('#newset').addEventListener('submit', (e) => {
     e.preventDefault();
     const set = createSetlist(app.querySelector('#setname').value.trim(), app.querySelector('#setdate').value);
     location.hash = `#/set/${set.id}`;
   });
+}
+
+function setGroup(sets, title, empty, upload = false) {
+  return `${title ? `<h2 class="setgroup">${esc(title)}</h2>` : ''}
+    <div class="list">
+      ${
+        sets.length
+          ? sets
+              .map(
+                (s) => `<div class="song setcard">
+                  <a class="song-main" href="#/set/${s.id}">
+                    <span class="song-title">${esc(s.name)}</span>
+                    <span class="song-sub">${esc(fmtDay(s.date) || 'Sin fecha')} · ${s.items.length} canciones</span>
+                  </a>
+                  ${upload ? `<button data-upload="${esc(s.id)}">Subir al equipo</button>` : ''}
+                </div>`,
+              )
+              .join('')
+          : empty
+            ? `<p class="empty">${esc(empty)}</p>`
+            : ''
+      }
+    </div>`;
 }
 
 function setItems(set) {
@@ -664,9 +693,14 @@ function renderSetlist(id, shared = null) {
       ${
         shared
           ? `<h1>${esc(set.name)}</h1><p class="author">${esc(fmtDay(set.date))}</p>
-             <div class="banner">Te compartieron este setlist. <button class="link" data-action="import">Guardarlo en mi teléfono</button></div>`
+             <div class="banner">Te compartieron este setlist. <button class="link" data-action="import">${teamMode() ? 'Guardarlo en los setlists del equipo' : 'Guardarlo en mi teléfono'}</button></div>`
           : `<input class="title-input" id="sname" value="${esc(set.name)}" aria-label="Nombre del setlist">
-             <input type="date" id="sdate" value="${esc(set.date)}" aria-label="Fecha">`
+             <input type="date" id="sdate" value="${esc(set.date)}" aria-label="Fecha">
+             ${
+               teamMode() && set.local
+                 ? '<div class="banner">Este setlist solo está en tu teléfono. <button class="link" data-action="upload">Subirlo al equipo</button></div>'
+                 : ''
+             }`
       }
       <ol class="setlist">
         ${
@@ -780,14 +814,26 @@ function renderSetlist(id, shared = null) {
     });
   fileAction('image', 'la imagen', setlistImage, 'png', 'image/png');
   fileAction('pdf', 'el PDF', setlistPdf, 'pdf', 'application/pdf');
+  app.querySelector('[data-action="upload"]')?.addEventListener('click', () => {
+    const up = uploadSetlist(set.id);
+    if (up) location.hash = `#/set/${up.id}`;
+  });
   app.querySelector('[data-action="duplicate"]').addEventListener('click', () => {
     const copy = duplicateSetlist(set.id);
     if (copy) location.hash = `#/set/${copy.id}`;
   });
-  app.querySelector('[data-action="delete"]').addEventListener('click', () => {
-    if (!confirm(`¿Borrar “${set.name}” de este teléfono?`)) return;
-    deleteSetlist(set.id);
-    location.hash = '#/sets';
+  app.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+    const shared = !set.local;
+    if (!confirm(shared ? `¿Borrar “${set.name}” para todo el equipo? Se pide el PIN.` : `¿Borrar “${set.name}” de este teléfono?`)) return;
+    const button = e.currentTarget;
+    button.disabled = true;
+    try {
+      await deleteSetlist(set.id);
+      location.hash = '#/sets';
+    } catch (err) {
+      alert(err.message);
+      button.disabled = false;
+    }
   });
   app.querySelector('[data-action="share"]').addEventListener('click', async () => {
     const url = `${location.origin}${location.pathname}#/compartido/${encodeSetlist(set)}`;
@@ -922,6 +968,31 @@ const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, s
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
 const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
+// Setlists del equipo: viven en la hoja privada. Verlos y editarlos no pide PIN; borrarlos sí.
+if (canEdit()) {
+  const { api, openApi } = setupApi(store);
+  useTeam({
+    list: async () => (await openApi('listSetlists')).setlists,
+    save: (set) => openApi('saveSetlist', set),
+    remove: (id) => api('deleteSetlist', { id }),
+    onError: (err) => {
+      alert(`No se pudo guardar el setlist en la hoja: ${err.message}`);
+      syncSets();
+    },
+  });
+}
+
+/** Trae los setlists del equipo y repinta si cambiaron, sin interrumpir a quien está escribiendo. */
+async function syncSets() {
+  try {
+    const changed = await refreshTeam();
+    const typing = app.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (changed && !typing && /^#\/(sets|set\/[^/]+)?$|^#?\/?$/.test(location.hash)) render();
+  } catch {
+    /* sin conexión: se queda la última copia */
+  }
+}
+
 function route() {
   const h = location.hash;
   let m;
@@ -969,7 +1040,10 @@ function render({ navigated = false } = {}) {
   window.scrollTo(0, y);
 }
 
-window.addEventListener('hashchange', () => render({ navigated: true }));
+window.addEventListener('hashchange', () => {
+  render({ navigated: true });
+  if (/^#\/(sets|set\/[^/]+)$/.test(location.hash)) syncSets();
+});
 window.addEventListener('scroll', () => {
   if (isList()) state.listScroll = window.scrollY;
 });
@@ -1013,7 +1087,10 @@ app.addEventListener('click', async (e) => {
 
 // Al volver a la app, trae los cambios de la hoja sin molestar.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') loadSongs({ quiet: true });
+  if (document.visibilityState === 'visible') {
+    loadSongs({ quiet: true });
+    syncSets();
+  }
 });
 
 if ('serviceWorker' in navigator) {
@@ -1021,4 +1098,4 @@ if ('serviceWorker' in navigator) {
 }
 
 app.innerHTML = '<p class="empty">Cargando repertorio…</p>';
-loadSongs();
+loadSongs().then(syncSets);

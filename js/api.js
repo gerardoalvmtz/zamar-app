@@ -41,7 +41,10 @@ export function setupApi(store) {
     }
   }
 
-  return { api, who: () => store.get('zamar:who', '') };
+  /** Acciones que el script deja hacer sin PIN (ver y editar setlists). */
+  const openApi = (action, payload = {}) => post({ action, who: store.get('zamar:who', ''), ...payload });
+
+  return { api, openApi, who: () => store.get('zamar:who', '') };
 }
 
 export function readBase64(file) {

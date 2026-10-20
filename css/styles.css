@@ -768,12 +768,3 @@ details.ideas[open] summary { margin-bottom: 12px; }
 .button.small { padding: 6px 12px; font-size: 0.85rem; }
 .delcomp { display: block; margin: 28px auto 0; color: var(--bad) !important; border-color: var(--bad) !important; }
 .spotifylink { display: inline-block; margin-top: 6px; }
-.spcard { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); text-decoration: none; }
-.spcard .spart { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; }
-.spcard .spart[hidden] { display: none; }
-.spcard .sptext { display: grid; gap: 2px; min-width: 0; padding-left: 4px; }
-.spcard strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spcard small { color: #1db954; font-weight: 600; font-size: 0.82rem; }
-.spcard .spicon { font-size: 1.2rem; color: var(--muted); padding-right: 6px; }
-.spplay { margin-top: 8px; }
-.listen .spotify { margin-top: 10px; }

@@ -211,7 +211,6 @@ function renderHome() {
       ${tile('#/sets', '📋', 'Setlists', sets.length ? `${sets.length} en este teléfono` : 'Arma el de tu próximo evento')}
       ${canEdit() ? tile('#/agenda', '📅', 'Agenda', 'Eventos y quién va') : ''}
       ${canEdit() ? tile('#/comp', '✍️', 'Composiciones', 'Ideas, audios y comentarios') : ''}
-      ${tile('#/puente', '🧭', 'Puente entre tonos', 'Cómo pasar de un tono a otro')}
     </div>
     <footer class="foot">${state.updatedAt ? `Actualizado ${esc(fmtDate(state.updatedAt))}` : ''}</footer>`;
 }

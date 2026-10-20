@@ -48,7 +48,7 @@ transponen al cambiar el tono.
 ## Qué hace
 
 - Página de **Inicio** con la foto del equipo, el próximo evento, la última canción abierta y accesos a cada
-  sección (Canciones, Setlists, Agenda, Composiciones y Puente entre tonos). El repertorio está en `#/canciones`.
+  sección (Canciones, Setlists, Agenda y Composiciones). El repertorio está en `#/canciones`.
 - Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),

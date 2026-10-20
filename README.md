@@ -86,6 +86,12 @@ Cuando una está *Terminada*, el botón **Pasar al repertorio** la agrega a la l
 y acordes. Cada composición tiene **Comentarios del equipo**, y cada audio su propio hilo para opinar sobre
 esa toma; cada comentario lleva quién lo escribió y la fecha. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
 
+**💡 Ideas de progresiones** (`#/comp/ideas`, y plegado en cada composición y en el editor): eliges un ánimo
+(Alegre, Melancólica, Reflexiva, Adoración íntima, Victoriosa, Esperanza, Súplica) y un tono, y salen cuatro
+progresiones con la sección donde suelen ir, por qué suenan así y el tempo sugerido. Se pueden **escuchar** y,
+en el editor, **agregar a los acordes** como ChordPro. Las progresiones están en grados en `js/progressions.js`;
+para agregar o cambiar alguna basta con editar `MOODS`. No usa el Apps Script.
+
 ### Agenda
 
 También con PIN. Cada evento lleva tipo, estatus (Invitación recibida, Pendiente de detalles, Confirmado,

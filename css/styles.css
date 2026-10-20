@@ -775,3 +775,6 @@ details.ideas[open] summary { margin-bottom: 12px; }
 .spcard strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spcard small { color: #1db954; font-weight: 600; font-size: 0.82rem; }
 .spcard .spicon { font-size: 1.2rem; color: var(--muted); padding-right: 6px; }
+details.connect { margin-top: 20px; }
+details.connect > summary { cursor: pointer; font: 600 0.78rem/1 var(--sans); letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); padding: 8px 0; }
+details.connect[open] > summary { margin-bottom: 8px; }

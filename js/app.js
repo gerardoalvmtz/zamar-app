@@ -606,8 +606,7 @@ function renderSong(id, ctx = null, came = null) {
         <p class="hint" id="saved"></p>
       </section>
 
-      <section>
-        <h2>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</h2>
+      ${ctx ? `<details class="connect"><summary>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</summary>` : `<section><h2>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</h2>`}
         ${key ? `<p class="hint"><a href="#/puente/${encodeURIComponent(keyName(key))}">🧭 Ver el puente hacia cualquier tono</a></p>` : ''}
         ${
           !key
@@ -629,7 +628,7 @@ function renderSong(id, ctx = null, came = null) {
                   .join('')}</div>`
               : '<p class="hint">Todavía no hay canciones con tonalidad compatible.</p>'
         }
-      </section>
+      ${ctx ? '</details>' : '</section>'}
       ${nextUp}
     </article>
     ${nav}`);

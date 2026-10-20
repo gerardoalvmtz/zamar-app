@@ -44,3 +44,18 @@ test('sugiere primero la tonalidad y el BPM más cercanos', () => {
   const out = suggestions(base, parseKey('G'), songs).map((x) => x.song.title);
   assert.deepEqual(out, ['Igual', 'Relativa']);
 });
+
+test('toma letra y acordes de la pestaña "Letras"', async () => {
+  const { rowsToTexts, attachTexts } = await import('../js/songs.js');
+  const songs = rowsToSongs([['Canción', 'Tonalidad'], ['Abba', 'Bb'], ['Otra', 'G']]);
+  const texts = rowsToTexts([
+    ['Canción', 'Letra', 'Acordes'],
+    ['ABBA ', 'Primera línea', '[Bb]Primera línea'],
+  ]);
+  attachTexts(songs, texts);
+  assert.equal(songs[0].lyrics, 'Primera línea');
+  assert.equal(songs[0].chords, '[Bb]Primera línea');
+  assert.equal(songs[1].lyrics, '');
+  // Si Google devuelve la pestaña principal en lugar de "Letras", se ignora.
+  assert.equal(rowsToTexts([['Canción', 'Estatus', 'Letra'], ['Abba', 'Lista', 'x']]).size, 0);
+});

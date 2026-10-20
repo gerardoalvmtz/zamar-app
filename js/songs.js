@@ -65,7 +65,6 @@ const COLUMNS = {
   bpm: ['bpm', 'tempo'],
   status: ['estatus', 'estado'],
   propresenter: ['lyrics propresenter', 'letra propresenter'],
-  songbook: ['acordes actualizados songbook'],
   chords: ['letra y acordes', 'acordes y letra', 'chordpro', 'cifrado'],
   lyrics: ['letra', 'lyrics'],
   notes: ['notas', 'comentarios', 'anotaciones'],
@@ -115,12 +114,48 @@ export function rowsToSongs(rows) {
       bpm: Number.isFinite(bpm) && bpm > 0 ? Math.round(bpm) : null,
       status: get(row, 'status'),
       propresenter: yes(get(row, 'propresenter')),
-      songbook: get(row, 'songbook'),
       chords: get(row, 'chords'),
       lyrics: get(row, 'lyrics'),
       notes: get(row, 'notes'),
       link: get(row, 'link'),
     });
+  }
+  return songs;
+}
+
+/**
+ * Pestaña opcional "Letras" de la hoja: una fila por canción con su letra y su hoja de acordes,
+ * para no llenar la pestaña principal de textos largos. Devuelve un Map por título normalizado.
+ */
+export function rowsToTexts(rows) {
+  const texts = new Map();
+  if (!rows?.length) return texts;
+  const norm = rows[0].map(normalize);
+  // Si la pestaña no existe, Google puede devolver la principal: esa no es la de letras.
+  if (norm.includes('estatus')) return texts;
+  const col = (names) => norm.findIndex((h) => names.includes(h));
+  const title = col(COLUMNS.title);
+  const lyrics = col(['letra', 'lyrics']);
+  const chords = col(['acordes', ...COLUMNS.chords]);
+  if (title < 0 || (lyrics < 0 && chords < 0)) return texts;
+  for (const row of rows.slice(1)) {
+    const t = normalize(row[title]);
+    if (!t) continue;
+    texts.set(t, {
+      lyrics: lyrics < 0 ? '' : String(row[lyrics] ?? '').trim(),
+      chords: chords < 0 ? '' : String(row[chords] ?? '').trim(),
+    });
+  }
+  return texts;
+}
+
+/** Completa letra y acordes de cada canción con lo que haya en la pestaña "Letras". */
+export function attachTexts(songs, texts) {
+  for (const song of songs) {
+    const t = texts.get(normalize(song.title));
+    if (!t) continue;
+    song.lyrics = song.lyrics || t.lyrics;
+    song.chords = song.chords || t.chords;
   }
   return songs;
 }

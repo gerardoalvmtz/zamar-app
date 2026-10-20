@@ -1,5 +1,5 @@
-import { sheetCsvUrl } from './config.js';
-import { parseCsv, rowsToSongs, suggestions, normalize } from './songs.js';
+import { sheetCsvUrl, LYRICS_SHEET_NAME } from './config.js';
+import { parseCsv, rowsToSongs, rowsToTexts, attachTexts, suggestions, normalize } from './songs.js';
 import {
   keyName,
   transposeKey,
@@ -39,11 +39,11 @@ const store = {
 };
 
 // ---------- datos ----------
-async function fetchSheet() {
+async function fetchSheet(name) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const res = await fetch(sheetCsvUrl(), { signal: ctrl.signal, cache: 'no-store' });
+    const res = await fetch(sheetCsvUrl(name), { signal: ctrl.signal, cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     // Si la hoja no es pública, Google responde con una página de inicio de sesión.
@@ -58,17 +58,20 @@ async function fetchSheet() {
 
 async function loadSongs({ quiet = false } = {}) {
   try {
-    const rows = await fetchSheet();
-    state.songs = rowsToSongs(rows);
+    const [rows, textRows] = await Promise.all([
+      fetchSheet(),
+      fetchSheet(LYRICS_SHEET_NAME).catch(() => null), // la pestaña de letras es opcional
+    ]);
+    state.songs = attachTexts(rowsToSongs(rows), rowsToTexts(textRows));
     state.source = 'live';
     state.updatedAt = new Date();
-    store.set(CACHE_KEY, { rows, at: state.updatedAt.toISOString() });
+    store.set(CACHE_KEY, { rows, textRows, at: state.updatedAt.toISOString() });
   } catch (err) {
     console.warn('No se pudo leer la hoja:', err);
     if (quiet && state.songs.length) return;
     const cached = store.get(CACHE_KEY);
     if (cached?.rows) {
-      state.songs = rowsToSongs(cached.rows);
+      state.songs = attachTexts(rowsToSongs(cached.rows), rowsToTexts(cached.textRows));
       state.source = 'cache';
       state.updatedAt = new Date(cached.at);
     } else {
@@ -86,6 +89,9 @@ async function loadSongs({ quiet = false } = {}) {
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+const logo = (cls, light, dark, alt) =>
+  `<picture class="${cls}"><source srcset="${dark}" media="(prefers-color-scheme: dark)"><img src="${light}" alt="${alt}"></picture>`;
+
 const fmtDate = (d) =>
   d.toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -93,14 +99,15 @@ function statusClass(status) {
   const s = normalize(status);
   if (s.startsWith('lista')) return 'ok';
   if (s.includes('repaso')) return 'warn';
-  return 'todo';
+  if (s.includes('estructura') || s.includes('ensayo')) return 'bad';
+  return 'none';
 }
 
 function sourceBanner() {
   if (state.source === 'live') return '';
   const msg =
     state.source === 'cache'
-      ? `Sin conexión con la hoja. Mostrando la copia guardada del ${fmtDate(state.updatedAt)}.`
+      ? `Sin conexión con la hoja. Mostrando la copia guardada del ${fmtDate(state.updatedAt)}`
       : `No se pudo leer la hoja en vivo. Mostrando la copia incluida en la app (${state.updatedAt.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}).`;
   return `<div class="banner">${esc(msg)} <button class="link" data-action="reload">Reintentar</button></div>`;
 }
@@ -150,10 +157,11 @@ function renderList() {
   const f = state.filters;
   document.title = 'Zamar · Repertorio';
   app.innerHTML = `
-    <header class="top">
-      <h1>Repertorio</h1>
+    <header class="top home">
+      ${logo('brand', 'img/logo-negro.png', 'img/logo-blanco.png', 'Zamar Adoración')}
       <button class="icon" data-action="reload" aria-label="Actualizar">⟳</button>
     </header>
+    <h1 class="eyebrow">Repertorio</h1>
     ${sourceBanner()}
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar canción o autor" value="${esc(f.q)}" autocomplete="off">
@@ -191,7 +199,13 @@ function renderChordText(text, shift, flats) {
       }
       if (/^\s*\{.*\}\s*$/.test(line)) return null; // otras directivas ChordPro
       if (/\[[^\]]+\]/.test(line)) {
-        return esc(line).replace(/\[([^\]]+)\]/g, '<span class="chord">$1</span>');
+        // Acorde encima de la sílaba donde cae, como en una hoja impresa.
+        const parts = line.split(/\[([^\]]+)\]/);
+        let html = esc(parts[0]);
+        for (let i = 1; i < parts.length; i += 2) {
+          html += `<span class="cp"><span class="chord">${esc(parts[i])}</span><span>${esc(parts[i + 1]) || ' '}</span></span>`;
+        }
+        return `<span class="cpline">${html}</span>`;
       }
       if (isChordLine(line)) return `<span class="chord">${esc(line)}</span>`;
       return esc(line);
@@ -200,10 +214,17 @@ function renderChordText(text, shift, flats) {
     .join('\n');
 }
 
+const songHeader = () => `<header class="top">
+    <a class="back" href="#/">‹ Repertorio</a>
+    ${logo('mark', 'img/simbolo-negro.png', 'img/simbolo-blanco.png', '')}
+  </header>`;
+
+const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '');
+
 function renderSong(id) {
   const song = state.songs.find((s) => s.id === id);
   if (!song) {
-    app.innerHTML = `<header class="top"><a class="back" href="#/">‹ Repertorio</a></header>
+    app.innerHTML = `${songHeader()}
       <p class="empty">No encontré esta canción. Quizá cambió de nombre en la hoja.</p>`;
     return;
   }
@@ -213,6 +234,7 @@ function renderSong(id) {
   const flats = useFlats(key);
   const notes = store.get(`zamar:notes:${song.id}`, '');
   const sugg = suggestions(song, key, state.songs);
+  const view = store.get('zamar:view', 'letra');
 
   const keyOptions = song.key
     ? Array.from({ length: 12 }, (_, i) => {
@@ -223,7 +245,7 @@ function renderSong(id) {
     : '';
 
   app.innerHTML = `
-    <header class="top"><a class="back" href="#/">‹ Repertorio</a></header>
+    ${songHeader()}
     ${sourceBanner()}
     <article class="detail">
       <h1>${esc(song.title)}</h1>
@@ -255,17 +277,23 @@ function renderSong(id) {
       </section>
 
       <section>
-        <h2>Acordes</h2>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-view="letra" aria-selected="${view === 'letra'}">Letra</button>
+          <button role="tab" data-view="acordes" aria-selected="${view === 'acordes'}">Acordes</button>
+        </div>
         ${
-          song.chords
-            ? `<pre class="sheet">${renderChordText(song.chords, shift, flats)}</pre>`
-            : '<p class="hint">Aún no hay acordes cargados para esta canción.</p>'
+          view === 'acordes'
+            ? song.chords
+              ? `<pre class="sheet">${renderChordText(song.chords, shift, flats)}</pre>`
+              : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>'
+            : song.lyrics
+              ? `<div class="sheet lyrics">${esc(song.lyrics)}</div>`
+              : '<p class="hint">Aún no hay letra cargada para esta canción.</p>'
         }
       </section>
 
-      ${song.lyrics ? `<section><h2>Letra</h2><pre class="sheet lyrics">${esc(song.lyrics)}</pre></section>` : ''}
       ${song.notes ? `<section><h2>Notas del equipo</h2><p class="teamnotes">${esc(song.notes)}</p></section>` : ''}
-      ${song.link ? `<section><a class="button" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
+      ${safeUrl(song.link) ? `<section><a class="button" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
 
       <section>
         <h2>Mis notas</h2>
@@ -306,6 +334,12 @@ function renderSong(id) {
   };
   app.querySelectorAll('[data-shift]').forEach((b) =>
     b.addEventListener('click', () => setShift(shift + Number(b.dataset.shift))),
+  );
+  app.querySelectorAll('[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      store.set('zamar:view', b.dataset.view);
+      renderSong(song.id);
+    }),
   );
   app.querySelector('#keysel')?.addEventListener('change', (e) => setShift(Number(e.target.value)));
   let t;

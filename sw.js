@@ -1,6 +1,6 @@
 // Guarda la app en el teléfono para que abra sin internet.
 // Los datos de la hoja los maneja app.js (siempre intenta la versión en vivo primero).
-const VERSION = 'zamar-v1';
+const VERSION = 'zamar-v2';
 const SHELL = [
   './',
   'index.html',
@@ -11,10 +11,14 @@ const SHELL = [
   'js/songs.js',
   'data/repertorio.json',
   'manifest.webmanifest',
-  'icons/icon.svg',
+  'img/logo-negro.png',
+  'img/logo-blanco.png',
+  'img/simbolo-negro.png',
+  'img/simbolo-blanco.png',
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (e) => {

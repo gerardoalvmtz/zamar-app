@@ -102,23 +102,32 @@ async function loadSongs({ quiet = false } = {}) {
     store.set(CACHE_KEY, { rows, textRows, at: state.updatedAt.toISOString() });
   } catch (err) {
     console.warn('No se pudo leer la hoja:', err);
-    if (quiet && state.songs.length) return;
-    const cached = store.get(CACHE_KEY);
-    if (cached?.rows) {
-      state.songs = attachTexts(rowsToSongs(cached.rows), rowsToTexts(cached.textRows));
-      state.source = 'cache';
-      state.updatedAt = new Date(cached.at);
-    } else {
+    if (state.source === 'refreshing') state.source = 'cache'; // ya se ve la copia: solo falta avisar
+    else if (quiet && state.songs.length) return;
+    else if (!fromCache()) {
       const snap = await fetch('data/repertorio.json').then((r) => r.json());
       state.songs = attachTexts(rowsToSongs(snap.rows), rowsToTexts(snap.letras));
       state.source = 'snapshot';
       state.updatedAt = new Date(snap.actualizado + 'T12:00:00');
     }
   }
-  // Una recarga en segundo plano no debe borrar un formulario o una grabación a medias.
+  // Una recarga en segundo plano no debe borrar un formulario, una grabación ni lo que se está escribiendo.
   if (quiet && /^#\/(comp(\/|$)|agenda\/|editar|nueva|importar)/.test(location.hash)) return;
+  if (quiet && isTyping()) return;
   render();
 }
+
+/** La última copia de la hoja guardada en el teléfono. */
+function fromCache() {
+  const cached = store.get(CACHE_KEY);
+  if (!cached?.rows) return false;
+  state.songs = attachTexts(rowsToSongs(cached.rows), rowsToTexts(cached.textRows));
+  state.source = 'cache';
+  state.updatedAt = new Date(cached.at);
+  return true;
+}
+
+const isTyping = () => app.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
 
 const songById = (id) => state.songs.find((s) => s.id === id);
 
@@ -146,7 +155,7 @@ function statusClass(status) {
 }
 
 function sourceBanner() {
-  if (state.source === 'live') return '';
+  if (state.source === 'live' || state.source === 'refreshing') return '';
   const msg =
     state.source === 'cache'
       ? `Sin conexión con la hoja. Mostrando la copia guardada del ${fmtDate(state.updatedAt)}`
@@ -986,8 +995,7 @@ if (canEdit()) {
 async function syncSets() {
   try {
     const changed = await refreshTeam();
-    const typing = app.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
-    if (changed && !typing && /^#\/(sets|set\/[^/]+)?$|^#?\/?$/.test(location.hash)) render();
+    if (changed && !isTyping() && /^#\/(sets|set\/[^/]+)?$|^#?\/?$/.test(location.hash)) render();
   } catch {
     /* sin conexión: se queda la última copia */
   }
@@ -1097,5 +1105,14 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service worker:', err));
 }
 
-app.innerHTML = '<p class="empty">Cargando repertorio…</p>';
-loadSongs().then(syncSets);
+// Abre al instante con la última copia guardada y trae la hoja en segundo plano
+// (Google tarda varios segundos en responder). La primera vez sí hay que esperarla.
+if (fromCache()) {
+  state.source = 'refreshing';
+  render();
+  loadSongs({ quiet: true });
+} else {
+  app.innerHTML = '<p class="empty">Cargando repertorio…</p>';
+  loadSongs();
+}
+syncSets();

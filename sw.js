@@ -1,6 +1,6 @@
 // Guarda la app en el teléfono para que abra sin internet.
 // Los datos de la hoja los maneja app.js (siempre intenta la versión en vivo primero).
-const VERSION = 'zamar-v16';
+const VERSION = 'zamar-v17';
 const SHELL = [
   './',
   'index.html',

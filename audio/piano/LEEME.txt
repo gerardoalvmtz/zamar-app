@@ -1,0 +1,6 @@
+Muestras de piano para "Escuchar" en Ideas de progresiones.
+
+Salamander Grand Piano V3, de Alexander Holm.
+Licencia: Creative Commons Attribution 3.0 (CC BY 3.0)
+https://creativecommons.org/licenses/by/3.0/
+Archivos MP3 tomados de https://github.com/Tonejs/audio (carpeta salamander).

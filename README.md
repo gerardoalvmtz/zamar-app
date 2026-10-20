@@ -88,7 +88,7 @@ esa toma; cada comentario lleva quién lo escribió y la fecha. Los datos viven 
 
 **💡 Ideas de progresiones** (`#/comp/ideas`, y plegado en cada composición y en el editor): eliges un ánimo
 (Alegre, Melancólica, Reflexiva, Adoración íntima, Victoriosa, Esperanza, Súplica) y un tono, y salen cuatro
-progresiones con la sección donde suelen ir, por qué suenan así y el tempo sugerido. Se pueden **escuchar** y,
+progresiones con la sección donde suelen ir, por qué suenan así y el tempo sugerido. Se pueden **escuchar** con sonido de piano real (muestras del Salamander Grand Piano, CC BY 3.0, en `audio/piano/`) y,
 en el editor, **agregar a los acordes** como ChordPro. Las progresiones están en grados en `js/progressions.js`;
 para agregar o cambiar alguna basta con editar `MOODS`. No usa el Apps Script.
 

@@ -172,43 +172,82 @@ export function toChordPro(p, mood) {
 }
 
 // ---------- escuchar ----------
-let audio = null;
+// Piano de verdad: muestras del Salamander Grand Piano (CC-BY 3.0, ver audio/piano/LEEME.txt)
+// cada tres semitonos; las notas de en medio se afinan cambiando un poco la velocidad.
+const SAMPLE_NAMES = ['C', 'Ds', 'Fs', 'A'];
+const SAMPLES = [];
+for (let midi = 36; midi <= 75; midi += 3) SAMPLES.push(midi); // C2 … D#5
+const sampleUrl = (midi) => new URL(`../audio/piano/${SAMPLE_NAMES[(midi % 12) / 3]}${Math.floor(midi / 12) - 1}.mp3`, import.meta.url);
+const nearest = (midi) => SAMPLES.reduce((a, b) => (Math.abs(b - midi) < Math.abs(a - midi) ? b : a));
 
-/** Toca la progresión con un sonido tipo pad. Un acorde por compás de 4 tiempos. */
-export function playProgression(chords, bpm = 80) {
+let audio = null;
+let current = null; // salida de la progresión que está sonando
+let playId = 0;
+const buffers = {};
+
+function sample(midi) {
+  buffers[midi] ||= fetch(sampleUrl(midi))
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+    .then((b) => new Promise((ok, bad) => audio.decodeAudioData(b, ok, bad)))
+    .catch((err) => {
+      delete buffers[midi];
+      throw err;
+    });
+  return buffers[midi];
+}
+
+/** Notas del acorde: acorde alrededor del Do central y el bajo una o dos octavas abajo. */
+export function voicing(c) {
+  return c.pcs.map((pc) => 60 + mod(pc) + (mod(pc) < 5 ? 12 : 0)).concat(36 + mod(c.bass) + (mod(c.bass) < 4 ? 12 : 0));
+}
+
+/**
+ * Toca la progresión en piano, un acorde por compás de 4 tiempos.
+ * Devuelve cuántos segundos dura (0 si el teléfono no puede tocar audio).
+ */
+export async function playProgression(chords, bpm = 80) {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return 0;
   audio ||= new AC();
-  if (audio.state === 'suspended') audio.resume();
+  const ctx = audio;
+  if (ctx.state === 'suspended') ctx.resume();
+  stopPlaying();
+  const id = ++playId;
+  const all = chords.map(voicing);
+  const needed = [...new Set(all.flat().map(nearest))];
+  const loaded = Object.fromEntries(await Promise.all(needed.map(async (m) => [m, await sample(m)])));
+  if (id !== playId) return 0; // se detuvo o se eligió otra mientras cargaba
   const beat = 60 / Math.min(Math.max(bpm, 50), 140);
   const bar = beat * 4;
-  const t0 = audio.currentTime + 0.05;
-  const out = audio.createGain();
-  out.gain.value = 0.18;
-  out.connect(audio.destination);
-  const freq = (midi) => 440 * 2 ** ((midi - 69) / 12);
-  chords.forEach((c, i) => {
+  const t0 = ctx.currentTime + 0.05;
+  const out = ctx.createGain();
+  out.gain.value = 1.5;
+  out.connect(ctx.destination);
+  current = out;
+  all.forEach((notes, i) => {
     const start = t0 + i * bar;
-    // Acorde alrededor del Do central y el bajo una octava y media abajo.
-    const notes = c.pcs.map((pc) => 60 + mod(pc) + (mod(pc) < 5 ? 12 : 0)).concat(36 + mod(c.bass) + (mod(c.bass) < 4 ? 12 : 0));
+    const end = start + bar + (i === all.length - 1 ? 1.5 : 0.1);
     notes.forEach((n, j) => {
-      const o = audio.createOscillator();
-      const g = audio.createGain();
-      o.type = j === notes.length - 1 ? 'sine' : 'triangle';
-      o.frequency.value = freq(n);
-      g.gain.setValueAtTime(0, start);
-      g.gain.linearRampToValueAtTime(j === notes.length - 1 ? 0.9 : 0.45, start + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.001, start + bar * 0.98);
-      o.connect(g).connect(out);
-      o.start(start);
-      o.stop(start + bar);
+      const base = nearest(n);
+      const src = ctx.createBufferSource();
+      src.buffer = loaded[base];
+      src.playbackRate.value = 2 ** ((n - base) / 12);
+      const g = ctx.createGain();
+      // El bajo va un poquito antes y más fuerte, como al tocar con las dos manos.
+      const at = start + (j === notes.length - 1 ? 0 : 0.012 * (j + 1));
+      g.gain.setValueAtTime(j === notes.length - 1 ? 0.55 : 0.32, at);
+      g.gain.setTargetAtTime(0, end - 0.25, 0.08);
+      src.connect(g).connect(out);
+      src.start(at);
+      src.stop(end + 0.4);
     });
   });
-  return chords.length * bar;
+  return chords.length * bar + 1.5;
 }
 
 export function stopPlaying() {
-  if (!audio) return;
-  audio.close();
-  audio = null;
+  playId++;
+  if (!current) return;
+  current.disconnect();
+  current = null;
 }

@@ -18,12 +18,12 @@ import {
   teamMode,
   refreshTeam,
 } from './setlists.js';
-import { canEdit, setupApi } from './api.js';
+import { canEdit, setupApi, readBase64 } from './api.js';
 import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
-import { setlistImage, setlistPdf, shareFile } from './setshare.js';
+import { setlistImage, setlistPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -762,10 +762,11 @@ function renderSetlist(id, shared = null) {
               </select>
               <ul class="addresults" id="addresults"></ul>
             </section>
-            <div class="row actions">
+            <div class="row actions setactions">
               ${rows.length ? `<a class="button" href="#/set/${set.id}/0">Tocar</a>` : ''}
               <button data-action="share">Compartir link</button>
               ${rows.length ? '<button data-action="image">🖼 Imagen</button><button data-action="pdf">📄 PDF con letras</button>' : ''}
+              ${rows.length && openApi ? '<button data-action="qr">🔳 QR con letras</button>' : ''}
               <button data-action="duplicate">Duplicar</button>
               <button class="danger" data-action="delete">Borrar</button>
             </div>
@@ -823,6 +824,23 @@ function renderSetlist(id, shared = null) {
     });
   fileAction('image', 'la imagen', setlistImage, 'png', 'image/png');
   fileAction('pdf', 'el PDF', setlistPdf, 'pdf', 'application/pdf');
+  app.querySelector('[data-action="qr"]')?.addEventListener('click', async (e) => {
+    const button = e.currentTarget;
+    const msg = document.getElementById('sharemsg');
+    if (set.local) return (msg.textContent = 'Primero sube este setlist al equipo.');
+    button.disabled = true;
+    msg.textContent = 'Generando el PDF y subiéndolo a Drive…';
+    try {
+      // El PDF para la asamblea va sin tonos ni BPM; se vuelve a subir para que lleve los últimos cambios.
+      const pdf = await setlistPdf(set, fileRows(), { audience: true });
+      const { url } = await openApi('uploadSetlistPdf', { id: set.id, data: await readBase64(pdf), name: fileName(set, 'pdf') });
+      msg.textContent = '';
+      await showQr(set, url);
+    } catch (err) {
+      msg.textContent = err.message || 'No se pudo generar el QR.';
+    }
+    button.disabled = false;
+  });
   app.querySelector('[data-action="upload"]')?.addEventListener('click', () => {
     const up = uploadSetlist(set.id);
     if (up) location.hash = `#/set/${up.id}`;
@@ -858,6 +876,41 @@ function renderSetlist(id, shared = null) {
       document.getElementById('sharemsg').innerHTML = `Copia este link: <input readonly value="${esc(url)}">`;
     }
   });
+}
+
+/** Ventana con el QR del PDF: para proyectarlo, imprimirlo o mandarlo. */
+async function showQr(set, url) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'qrdialog';
+  dialog.innerHTML = `
+    <h2>${esc(set.name)}</h2>
+    <p class="hint">Quien escanee este código abre el PDF con las letras. Si cambias el setlist, vuelve a generar el QR.</p>
+    <div class="qrbox"></div>
+    <div class="row actions setactions">
+      <button data-q="share">Compartir QR</button>
+      <a class="button ghost" href="${esc(url)}" target="_blank" rel="noopener">Abrir PDF</a>
+      <button data-q="copy">Copiar link</button>
+      <button data-q="close">Cerrar</button>
+    </div>
+    <p class="hint" data-q="msg"></p>`;
+  dialog.querySelector('.qrbox').append(await qrCanvas(url, 520));
+  document.body.append(dialog);
+  const msg = dialog.querySelector('[data-q="msg"]');
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-q="close"]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('[data-q="copy"]').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      msg.textContent = 'Link copiado.';
+    } catch {
+      msg.innerHTML = `Copia este link: <input readonly value="${esc(url)}">`;
+    }
+  });
+  dialog.querySelector('[data-q="share"]').addEventListener('click', async () => {
+    const how = await shareFile(await qrPoster(set, url), set, 'png', 'image/png', '-qr');
+    if (how === 'downloaded') msg.textContent = 'Se descargó la imagen del QR.';
+  });
+  dialog.showModal();
 }
 
 // Búsqueda para agregar canciones al setlist; se recuerda entre cada cambio de la lista.
@@ -978,8 +1031,11 @@ const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeH
 const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
 // Setlists del equipo: viven en la hoja privada. Verlos y editarlos no pide PIN; borrarlos sí.
+let openApi = null;
 if (canEdit()) {
-  const { api, openApi } = setupApi(store);
+  const team = setupApi(store);
+  const { api } = team;
+  openApi = team.openApi;
   useTeam({
     list: async () => (await openApi('listSetlists')).setlists,
     save: (set) => openApi('saveSetlist', set),

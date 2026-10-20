@@ -29,14 +29,17 @@ const RSVP_ANSWERS = ['Voy', 'Tal vez', 'No puedo'];
 // Comentarios del equipo sobre una composición o sobre uno de sus audios (Audio = link del audio).
 const COMMENT_HEADERS = ['ID', 'Composición', 'Audio', 'Quién', 'Comentario', 'Fecha'];
 // Setlists del equipo. Canciones = JSON con [id de canción, tono] en orden.
-const SETLIST_HEADERS = ['ID', 'Nombre', 'Fecha', 'Canciones', 'Creado', 'Actualizado', 'Quién'];
+// PDF = id del archivo en Drive con las letras para compartir por QR (uno por setlist; se reemplaza).
+const SETLIST_HEADERS = ['ID', 'Nombre', 'Fecha', 'Canciones', 'Creado', 'Actualizado', 'Quién', 'PDF'];
 const MAX_SETLIST_SONGS = 60;
+const SETLIST_PDF_FOLDER = 'Zamar · Setlists para compartir';
+const MAX_PDF_BYTES = 8 * 1024 * 1024;
 const PRIVATE_TABS = {
   Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Comentarios: COMMENT_HEADERS,
   Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS, Setlists: SETLIST_HEADERS,
 };
 // Acciones que no piden PIN: ver, crear y editar setlists (borrarlos sí lo pide).
-const OPEN_ACTIONS = ['listSetlists', 'saveSetlist'];
+const OPEN_ACTIONS = ['listSetlists', 'saveSetlist', 'uploadSetlistPdf'];
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -413,7 +416,13 @@ const ACTIONS = {
         items = JSON.parse(String(r.Canciones || '[]'));
       } catch (ignored) {}
       items = (Array.isArray(items) ? items : []).map((x) => ({ id: String(x[0] || ''), key: String(x[1] || '') }));
-      return { id: String(r.ID), name: String(r.Nombre || ''), date: String(r.Fecha || '').slice(0, 10), items: items };
+      return {
+        id: String(r.ID),
+        name: String(r.Nombre || ''),
+        date: String(r.Fecha || '').slice(0, 10),
+        items: items,
+        pdf: r.PDF ? 'https://drive.google.com/file/d/' + r.PDF + '/view' : '',
+      };
     });
     return { ok: true, setlists: sets.filter((x) => x.id) };
   },
@@ -442,13 +451,41 @@ const ACTIONS = {
     return { ok: true, id: id };
   },
 
+  /** Sube el PDF con letras del setlist a Drive (público con el link) y reemplaza el anterior. */
+  uploadSetlistPdf(p) {
+    const sheet = compSheet('Setlists');
+    const row = findById(sheet, p.id);
+    if (!row) throw new Error('Primero guarda el setlist.');
+    const bytes = Utilities.base64Decode(p.data || '');
+    if (bytes.length < 5 || bytes.length > MAX_PDF_BYTES) throw new Error('El PDF no es válido o pesa más de 8 MB.');
+    if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== '%PDF') throw new Error('El archivo no es un PDF.');
+    const col = column(sheet, 'PDF', true);
+    const old = String(sheet.getRange(row, col).getValue() || '');
+    if (old) {
+      try {
+        DriveApp.getFileById(old).setTrashed(true);
+      } catch (ignored) {}
+    }
+    const name = String(p.name || 'setlist.pdf').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+    const file = filesFolder(SETLIST_PDF_FOLDER).createFile(Utilities.newBlob(bytes, 'application/pdf', name));
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    sheet.getRange(row, col).setValue(file.getId());
+    log('PDF de setlist', records(sheet)[row - 2].Nombre, name, p.who);
+    return { ok: true, url: 'https://drive.google.com/file/d/' + file.getId() + '/view' };
+  },
+
   deleteSetlist(p) {
     const sheet = compSheet('Setlists');
     const row = findById(sheet, p.id);
     if (!row) return { ok: true };
-    const name = records(sheet)[row - 2].Nombre;
+    const rec = records(sheet)[row - 2];
+    if (rec.PDF) {
+      try {
+        DriveApp.getFileById(String(rec.PDF)).setTrashed(true);
+      } catch (ignored) {}
+    }
     sheet.deleteRow(row);
-    log('Borrar setlist', name, '', p.who);
+    log('Borrar setlist', rec.Nombre, '', p.who);
     return { ok: true };
   },
 

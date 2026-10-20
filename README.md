@@ -47,6 +47,8 @@ transponen al cambiar el tono.
 
 ## Qué hace
 
+- Página de **Inicio** con la foto del equipo, el próximo evento, la última canción abierta y accesos a cada
+  sección (Canciones, Setlists, Agenda, Composiciones y Puente entre tonos). El repertorio está en `#/canciones`.
 - Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
@@ -76,7 +78,8 @@ Con la edición activa aparece la pestaña **Composiciones**, que pide el PIN. A
 nuevas por etapa (Idea, En proceso, Terminada): título, autores, tono, BPM, letra, acordes, notas y los audios
 de referencia de cada momento, que se graban desde el teléfono o se suben como archivo (hasta 25 MB).
 Cuando una está *Terminada*, el botón **Pasar al repertorio** la agrega a la lista de canciones con su letra
-y acordes. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
+y acordes. Cada composición tiene **Comentarios del equipo**, y cada audio su propio hilo para opinar sobre
+esa toma; cada comentario lleva quién lo escribió y la fecha. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
 
 ### Agenda
 
@@ -85,7 +88,7 @@ Realizado, Cancelado), fecha, hora de llegada, inicio y fin, lugar, contacto y n
 **próximo evento** con su cuenta regresiva y quién va; la lista se puede ver por mes o como calendario.
 En cada evento cada quien marca **Voy / Tal vez / No puedo** con lo que toca, se puede vincular un setlist,
 compartir el resumen por WhatsApp, agregarlo al calendario del teléfono y abrir el lugar en Maps.
-El próximo evento también aparece como aviso en la pantalla de canciones (con la última copia guardada).
+El próximo evento también aparece en la página de inicio (con la última copia guardada).
 
 ## Publicarla (GitHub Pages, gratis)
 

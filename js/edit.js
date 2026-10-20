@@ -32,7 +32,7 @@ export function setupEditing(ctx) {
   function renderEdit(id) {
     const song = id ? songById(id) : null;
     if (id && !song) {
-      app.innerHTML = `${backHeader('#/', 'Repertorio')}<p class="empty">No encontré esta canción.</p>`;
+      app.innerHTML = `${backHeader('#/canciones', 'Repertorio')}<p class="empty">No encontré esta canción.</p>`;
       return;
     }
     const s = song || { title: '', author: '', themes: [], voice: '', catholic: false, status: '', spotify: '' };
@@ -198,7 +198,7 @@ export function setupEditing(ctx) {
   function renderImport() {
     document.title = 'Importar .cho · Zamar';
     app.innerHTML = `
-      ${backHeader('#/', 'Repertorio')}
+      ${backHeader('#/canciones', 'Repertorio')}
       <article class="detail">
         <h1>Importar desde Songbook Pro</h1>
         <p class="hint">En Songbook Pro exporta las canciones como ChordPro (.cho) y elígelas aquí. Puedes elegir varias a la vez.</p>

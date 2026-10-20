@@ -285,6 +285,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 
 .keyctl select option { color: var(--text); background: var(--surface); }
 
+/* El recuadro de tono y BPM va en un tono suave, no en negro sólido. */
+.card.keybox { background: var(--sunken); color: var(--text); border: 1px solid var(--line); }
+.card.keybox .keyctl button, .card.keybox .keyctl select { background: var(--surface); border-color: var(--line); }
+
 .keyctl button { min-width: 56px; font-weight: 700; }
 
 .tabs {

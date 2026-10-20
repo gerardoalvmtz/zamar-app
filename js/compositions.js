@@ -546,6 +546,7 @@ export function setupCompositions(ctx) {
             <button type="submit" class="primary">Guardar</button>
             <a class="button ghost" href="${back}">Cancelar</a>
           </div>
+          ${c ? '<button type="button" class="button ghost danger delcomp" data-action="delcomp">🗑 Borrar composición</button>' : ''}
         </form>`;
       const form = app.querySelector('#editor');
       const msg = (t) => (app.querySelector('#editmsg').textContent = t);
@@ -572,6 +573,25 @@ export function setupCompositions(ctx) {
         if (meta.key && !form.elements.Tono.value && parseKey(meta.key)) form.elements.Tono.value = meta.key;
         if (meta.tempo && !form.elements.BPM.value) form.elements.BPM.value = Math.round(parseFloat(meta.tempo)) || '';
         msg(`Cargué ${file.name}. Revisa y toca Guardar.`);
+      });
+
+      app.querySelector('[data-action="delcomp"]')?.addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        const n = audiosOf(c.id).length;
+        const extra = n ? ` y sus ${n} audio${n > 1 ? 's' : ''} (quedan 30 días en la papelera de Drive)` : '';
+        if (!confirm(`¿Borrar “${c.title}”${extra}? Se borran también sus comentarios. No se puede deshacer desde la app.`)) return;
+        b.disabled = true;
+        msg('Borrando…');
+        try {
+          await api('deleteComposition', { id: c.id });
+          data.items = data.items.filter((x) => x.id !== c.id);
+          data.audios = data.audios.filter((a) => String(a['Composición']) !== c.id);
+          data.comments = data.comments.filter((m) => String(m['Composición']) !== c.id);
+          location.hash = '#/comp';
+        } catch (err) {
+          msg(err.message);
+          b.disabled = false;
+        }
       });
 
       form.addEventListener('submit', async (e) => {

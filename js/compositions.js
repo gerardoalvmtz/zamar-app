@@ -177,7 +177,7 @@ export function setupCompositions(ctx) {
                             <span class="song-title">${esc(a.Etiqueta || a.Archivo)}</span>
                             <span class="song-sub">${esc(fmt(a.Fecha))}${a['Quién'] ? ` · ${esc(a['Quién'])}` : ''}</span>
                           </div>
-                          ${fid ? `<audio controls preload="none" src="https://drive.google.com/uc?export=download&id=${esc(fid)}"></audio>` : ''}
+                          ${fid ? `<button type="button" class="button ghost small" data-listen="${esc(fid)}">▶ Escuchar</button><audio controls hidden></audio>` : ''}
                           ${/^https:\/\//.test(a.Link) ? `<a class="hint" href="${esc(a.Link)}" target="_blank" rel="noopener">Abrir en Drive</a>` : ''}
                           ${thread(c.id, String(a.Link || ''), 'Comenta este audio')}
                         </li>`;
@@ -402,6 +402,27 @@ export function setupCompositions(ctx) {
     );
   }
 
+  // ---------- escuchar audios ----------
+  // El link directo de Drive falla seguido en el teléfono (sobre todo en iPhone), así que el
+  // audio se pide al Apps Script y se toca desde la memoria. Si el Apps Script todavía no tiene
+  // esa acción, se usa el link de Drive como antes.
+  const audioUrls = {};
+  async function audioUrl(fileId) {
+    if (audioUrls[fileId]) return audioUrls[fileId];
+    let url;
+    try {
+      const res = await api('getAudio', { fileId });
+      const bytes = Uint8Array.from(atob(res.data), (ch) => ch.charCodeAt(0));
+      url = URL.createObjectURL(new Blob([bytes], { type: playableType(res.mimeType) }));
+    } catch (err) {
+      if (!/acción|action|desconocid|unknown/i.test(err.message)) throw err;
+      url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+    }
+    return (audioUrls[fileId] = url);
+  }
+  // Safari no reconoce "audio/x-m4a", que es como Drive etiqueta las grabaciones del iPhone.
+  const playableType = (t) => (/m4a|mp4|aac/i.test(t || '') ? 'audio/mp4' : t || 'audio/mpeg');
+
   // ---------- grabar o subir audio ----------
   function setupAudio(c) {
     const msg = (t) => (app.querySelector('#amsg').textContent = t);
@@ -424,6 +445,24 @@ export function setupCompositions(ctx) {
         msg(err.message);
       }
     }
+
+    app.querySelectorAll('[data-listen]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const player = b.nextElementSibling;
+        b.disabled = true;
+        b.textContent = 'Cargando audio…';
+        try {
+          player.src = await audioUrl(b.dataset.listen);
+          b.remove();
+          player.hidden = false;
+          await player.play().catch(() => {});
+        } catch (err) {
+          b.disabled = false;
+          b.textContent = '▶ Escuchar';
+          msg(`No pude cargar el audio (${err.message}). Prueba con “Abrir en Drive”.`);
+        }
+      }),
+    );
 
     app.querySelector('#afile').addEventListener('change', (e) => {
       const file = e.target.files[0];

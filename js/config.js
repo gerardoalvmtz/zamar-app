@@ -14,4 +14,4 @@ export const sheetCsvUrl = (gid = MAIN_GID) =>
 
 // Link del programa de Apps Script que guarda los cambios hechos desde la app
 // (ver apps-script/LEEME.md). Mientras esté vacío, la app es solo de lectura.
-export const WRITE_URL = '';
+export const WRITE_URL = 'https://script.google.com/macros/s/AKfycbzGTE178jhK3QbOKMe-Tkm3I_s-FfxhoCuScFa1UBv1fidL9w8XvT2w6MvAumZjf6zF/exec';

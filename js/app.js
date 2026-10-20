@@ -334,12 +334,48 @@ function renderResults() {
 }
 
 // ---------- ficha de canción ----------
+// Spotify en la ficha. En una pestaña del navegador va el reproductor; abierta desde el acceso
+// directo de la pantalla de inicio (iPhone, sea de Safari o de Chrome), Spotify no deja cargar su
+// reproductor, así que ahí va una tarjeta con portada y nombre que abre la app de Spotify.
+const spotifyParts = (url) => String(url).match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist)\/([A-Za-z0-9]+)/);
+const installedApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+
 function spotifyEmbed(url) {
-  const m = String(url).match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist)\/([A-Za-z0-9]+)/);
+  const m = spotifyParts(url);
   if (!m) return '';
-  const src = `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator`;
-  return `<iframe class="spotify" src="${src}" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify"></iframe>
+  const ref = `${m[1]}/${m[2]}`;
+  if (!installedApp()) {
+    return `<iframe class="spotify" src="https://open.spotify.com/embed/${ref}?utm_source=generator" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify"></iframe>
     <a class="hint spotifylink" href="${esc(url)}" target="_blank" rel="noopener">¿No carga? Abrir en Spotify</a>`;
+  }
+  const info = store.get('zamar:spotify', {})[ref];
+  return `<a class="spcard" data-sp="${esc(ref)}" href="${esc(url)}" target="_blank" rel="noopener">
+      <img class="spart" alt="" ${info?.img ? `src="${esc(info.img)}"` : 'hidden'}>
+      <span class="sptext"><strong>${esc(info?.title || 'Escuchar en Spotify')}</strong><small>Abrir en Spotify</small></span>
+      <span class="spicon" aria-hidden="true">↗</span>
+    </a>`;
+}
+
+/** Trae portada y nombre de Spotify la primera vez y los guarda para las siguientes. */
+async function hydrateSpotify() {
+  const card = app.querySelector('.spcard[data-sp]');
+  if (!card) return;
+  const ref = card.dataset.sp;
+  const cache = store.get('zamar:spotify', {});
+  if (cache[ref]) return;
+  try {
+    const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/${ref}`)}`);
+    if (!res.ok) return;
+    const j = await res.json();
+    cache[ref] = { title: String(j.title || ''), img: /^https:\/\//.test(j.thumbnail_url) ? j.thumbnail_url : '' };
+    store.set('zamar:spotify', cache);
+    const now = app.querySelector(`.spcard[data-sp="${CSS.escape(ref)}"]`);
+    if (!now) return;
+    if (cache[ref].title) now.querySelector('strong').textContent = cache[ref].title;
+    if (cache[ref].img) Object.assign(now.querySelector('img'), { src: cache[ref].img, hidden: false });
+  } catch {
+    // Sin conexión o Spotify no respondió: se queda la tarjeta sencilla.
+  }
 }
 
 /**
@@ -599,6 +635,7 @@ function renderSong(id, ctx = null, came = null) {
     ${nav}`);
 
   const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index }, came);
+  hydrateSpotify();
   const moveKey = (d) => {
     if (ctx) {
       ctx.set.items[ctx.index].key = keyName(transposeKey(key, d));

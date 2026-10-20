@@ -322,6 +322,35 @@ const ACTIONS = {
     return { ok: true, audio: audio };
   },
 
+  // Borra la composición con sus comentarios. Los audios se mandan a la papelera de Drive,
+  // donde se pueden recuperar durante 30 días.
+  deleteComposition(p) {
+    const sheet = compSheet('Composiciones');
+    const row = findById(sheet, p.id);
+    if (!row) return { ok: true };
+    const title = records(sheet)[row - 2]['Título'];
+    const drop = (tab, each) => {
+      const s = compSheet(tab);
+      const recs = records(s);
+      for (let i = recs.length - 1; i >= 0; i--) {
+        if (String(recs[i]['Composición']) !== String(p.id)) continue;
+        if (each) each(recs[i]);
+        s.deleteRow(i + 2);
+      }
+    };
+    drop('Audios', (a) => {
+      const id = (String(a.Link).match(/\/d\/([A-Za-z0-9_-]+)/) || [])[1];
+      if (!id) return;
+      try {
+        DriveApp.getFileById(id).setTrashed(true);
+      } catch (ignored) {}
+    });
+    drop('Comentarios');
+    sheet.deleteRow(row);
+    log('Borrar composición', title, '', p.who);
+    return { ok: true };
+  },
+
   // El teléfono no siempre puede reproducir el link directo de Drive (sobre todo en iPhone),
   // así que el audio se manda desde aquí y la app lo toca desde la memoria.
   getAudio(p) {

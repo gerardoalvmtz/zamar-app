@@ -9,6 +9,13 @@ const LYRICS_GID = 1658370148; // pestaña Letras
 const LOG_SHEET = 'Cambios';
 const FILES_FOLDER = 'Zamar · Archivos de la app';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+// Las composiciones van en una hoja aparte que NO es pública: solo se leen con el PIN.
+const COMPOSITIONS_FILE = 'Zamar · Composiciones';
+const AUDIO_FOLDER = 'Zamar · Audios de composiciones';
+const COMP_HEADERS = ['ID', 'Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas', 'Creada', 'Actualizada'];
+const AUDIO_HEADERS = ['Composición', 'Etiqueta', 'Archivo', 'Link', 'Fecha', 'Quién'];
+const COMP_EDITABLE = ['Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas'];
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -36,6 +43,16 @@ function cambiarPin() {
   }
   PropertiesService.getScriptProperties().setProperty('PIN', pin);
   ui.alert('Listo. Comparte el PIN solo con quienes deben poder editar.');
+}
+
+/**
+ * Córrelo una vez desde el editor (botón ▶ Ejecutar) después de pegar el código nuevo:
+ * pide los permisos que faltan y crea en tu Drive la hoja privada de composiciones.
+ */
+function prepararComposiciones() {
+  const ss = compositionsFile();
+  filesFolder(AUDIO_FOLDER);
+  Logger.log('Listo: ' + ss.getUrl());
 }
 
 // ---------- utilidades ----------
@@ -103,9 +120,53 @@ function writeFields(sheet, row, fields, allowed) {
   return changed;
 }
 
-function filesFolder() {
-  const it = DriveApp.getFoldersByName(FILES_FOLDER);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(FILES_FOLDER);
+function filesFolder(name) {
+  const it = DriveApp.getFoldersByName(name || FILES_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(name || FILES_FOLDER);
+}
+
+/** Hoja privada de composiciones; se crea en tu Drive la primera vez. */
+function compositionsFile() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('COMPOSITIONS_ID');
+  if (id) {
+    try {
+      return SpreadsheetApp.openById(id);
+    } catch (err) {
+      // Si alguien borró el archivo se crea otro.
+    }
+  }
+  const ss = SpreadsheetApp.create(COMPOSITIONS_FILE);
+  const comps = ss.getSheets()[0];
+  comps.setName('Composiciones');
+  comps.appendRow(COMP_HEADERS);
+  ss.insertSheet('Audios').appendRow(AUDIO_HEADERS);
+  props.setProperty('COMPOSITIONS_ID', ss.getId());
+  return ss;
+}
+
+function compSheet(name) {
+  return compositionsFile().getSheetByName(name);
+}
+
+/** Filas de una pestaña como objetos { encabezado: valor }. */
+function records(sheet) {
+  const last = sheet.getLastRow();
+  if (last < 2) return [];
+  const h = headers(sheet);
+  return sheet.getRange(2, 1, last - 1, h.length).getValues().map((row) => {
+    const o = {};
+    h.forEach((name, i) => (o[name] = row[i] instanceof Date ? row[i].toISOString() : row[i]));
+    return o;
+  });
+}
+
+function findById(sheet, id) {
+  const last = sheet.getLastRow();
+  if (!id || last < 2) return 0;
+  const values = sheet.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < values.length; i++) if (String(values[i][0]) === String(id)) return i + 2;
+  return 0;
 }
 
 // ---------- acciones ----------
@@ -153,7 +214,7 @@ const ACTIONS = {
     if (!bytes.length) throw new Error('El archivo está vacío.');
     if (bytes.length > MAX_FILE_BYTES) throw new Error('El archivo pesa más de 10 MB.');
     const name = String(p.name || 'archivo').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
-    const file = filesFolder().createFile(Utilities.newBlob(bytes, p.mimeType || 'application/octet-stream', p.title + ' · ' + name));
+    const file = filesFolder(FILES_FOLDER).createFile(Utilities.newBlob(bytes, p.mimeType || 'application/octet-stream', p.title + ' · ' + name));
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     const sheet = sheetByGid(LYRICS_GID);
     let row = findRow(sheet, p.title);
@@ -167,6 +228,73 @@ const ACTIONS = {
     cell.setValue(cell.getValue() ? cell.getValue() + '\n' + line : line);
     log('Subir archivo', p.title, name, p.who);
     return { ok: true, url: file.getUrl() };
+  },
+
+  // ---------- composiciones ----------
+  listCompositions() {
+    return { ok: true, items: records(compSheet('Composiciones')), audios: records(compSheet('Audios')) };
+  },
+
+  saveComposition(p) {
+    const sheet = compSheet('Composiciones');
+    let row = findById(sheet, p.id);
+    const now = new Date();
+    let id = p.id;
+    if (!row) {
+      if (!String((p.fields || {})['Título'] || '').trim()) throw new Error('Falta el título.');
+      id = Utilities.getUuid().slice(0, 8);
+      row = sheet.getLastRow() + 1;
+      sheet.getRange(row, column(sheet, 'ID', true)).setValue(id);
+      sheet.getRange(row, column(sheet, 'Creada', true)).setValue(now);
+    }
+    const changed = writeFields(sheet, row, p.fields, COMP_EDITABLE);
+    sheet.getRange(row, column(sheet, 'Actualizada', true)).setValue(now);
+    log('Composición', (p.fields || {})['Título'] || id, changed.join(', '), p.who);
+    return { ok: true, id: id };
+  },
+
+  uploadAudio(p) {
+    if (!findById(compSheet('Composiciones'), p.id)) throw new Error('No encontré la composición.');
+    const bytes = Utilities.base64Decode(p.data || '');
+    if (!bytes.length) throw new Error('El audio está vacío.');
+    if (bytes.length > MAX_AUDIO_BYTES) throw new Error('El audio pesa más de 25 MB.');
+    const name = String(p.name || 'audio').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+    const file = filesFolder(AUDIO_FOLDER).createFile(Utilities.newBlob(bytes, p.mimeType || 'audio/mpeg', name));
+    // Solo quien tenga el link (que solo se ve con el PIN) puede escucharlo.
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const audio = {
+      'Composición': p.id,
+      Etiqueta: String(p.label || '').slice(0, 200),
+      Archivo: name,
+      Link: file.getUrl(),
+      Fecha: new Date().toISOString(),
+      'Quién': String(p.who || '').slice(0, 80),
+    };
+    compSheet('Audios').appendRow(AUDIO_HEADERS.map((h) => audio[h]));
+    log('Audio de composición', p.id, name, p.who);
+    return { ok: true, audio: audio };
+  },
+
+  /** Pasa una composición terminada al repertorio (RESUMEN y Letras). */
+  promoteComposition(p) {
+    const sheet = compSheet('Composiciones');
+    const row = findById(sheet, p.id);
+    if (!row) throw new Error('No encontré la composición.');
+    const c = records(sheet)[row - 2];
+    const title = String(c['Título'] || '').trim();
+    ACTIONS.addSong({
+      who: p.who,
+      fields: {
+        'Canción': title,
+        Autor: c.Autores,
+        'Tonalidad Zamar': c.Tono,
+        BPM: c.BPM,
+        Estatus: 'Pendiente ensayo / Definir estructura',
+      },
+    });
+    ACTIONS.updateTexts({ who: p.who, title: title, fields: { Letra: c.Letra, Acordes: c.Acordes } });
+    writeFields(sheet, row, { Estado: 'En repertorio' }, COMP_EDITABLE);
+    return { ok: true, title: title };
   },
 };
 

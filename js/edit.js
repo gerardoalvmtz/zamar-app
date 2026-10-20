@@ -1,11 +1,9 @@
 // Edición desde la app: manda los cambios al programa de Apps Script de la hoja,
 // que los guarda en el Sheets. Pide un PIN que el ministerio comparte entre quienes editan.
-import { WRITE_URL } from './config.js';
+import { setupApi, readBase64 } from './api.js';
 import { normalize } from './songs.js';
 import { parseKey, keyName } from './music.js';
 import { metadata } from './chordpro.js';
-
-export const canEdit = () => Boolean(WRITE_URL);
 
 const VOICES = ['', 'Hombre', 'Mujer', 'Ambos'];
 
@@ -13,52 +11,9 @@ const VOICES = ['', 'Hombre', 'Mujer', 'Ambos'];
 export function setupEditing(ctx) {
   const { app, state, store, esc, backHeader, songById, loadSongs } = ctx;
 
-  async function post(body) {
-    const res = await fetch(WRITE_URL, {
-      method: 'POST',
-      // text/plain evita la verificación previa (CORS) que Apps Script no responde.
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'No se pudo guardar.');
-    return data;
-  }
-
-  /** PIN y nombre para el registro de cambios; se piden la primera vez y se recuerdan. */
-  async function credentials() {
-    let pin = store.get('zamar:pin', '');
-    let who = store.get('zamar:who', '');
-    if (pin) return { pin, who };
-    pin = (prompt('PIN de edición del ministerio:') || '').trim();
-    if (!pin) throw new Error('Se necesita el PIN para editar.');
-    await post({ action: 'check', pin });
-    who = (prompt('¿Tu nombre? Queda en el registro de cambios.') || '').trim();
-    store.set('zamar:pin', pin);
-    store.set('zamar:who', who);
-    return { pin, who };
-  }
-
-  async function api(action, payload) {
-    const { pin, who } = await credentials();
-    try {
-      return await post({ action, pin, who, ...payload });
-    } catch (err) {
-      if (/PIN incorrecto/.test(err.message)) store.set('zamar:pin', '');
-      throw err;
-    }
-  }
+  const { api } = setupApi(store);
 
   const readText = (file) => file.text();
-
-  function readBase64(file) {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result).split(',')[1] || '');
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(file);
-    });
-  }
 
   const statuses = () => [...new Set(state.songs.map((s) => s.status).filter(Boolean))].sort();
 

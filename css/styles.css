@@ -683,3 +683,4 @@ details.transition .bridge { margin-top: 8px; font-size: 0.9rem; color: var(--te
 .nextup details.more .bridge { margin-top: 10px; }
 .keypair { margin-top: 16px; }
 .bridgelink { display: block; margin-top: 14px; text-align: center; }
+.nextup.camefrom { margin-top: 18px; }

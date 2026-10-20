@@ -337,7 +337,40 @@ function renderResults() {
 function spotifyEmbed(url) {
   const m = String(url).match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist)\/([A-Za-z0-9]+)/);
   if (!m) return '';
-  return `<iframe class="spotify" src="https://open.spotify.com/embed/${m[1]}/${m[2]}" height="${m[1] === 'track' ? 80 : 152}" loading="lazy" allow="encrypted-media" title="Spotify"></iframe>`;
+  const src = `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator`;
+  return `<iframe class="spotify" src="${src}" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify"></iframe>
+    <a class="hint spotifylink" href="${esc(url)}" target="_blank" rel="noopener">¿No carga? Abrir en Spotify</a>`;
+}
+
+/**
+ * Dibuja la ficha sin tocar el reproductor de Spotify si sigue siendo la misma canción.
+ * Al cambiar de tono o al llegar la hoja nueva se vuelve a dibujar todo, y un iframe que se
+ * quita de la página se recarga desde cero; en el teléfono eso lo dejaba en blanco.
+ */
+function renderKeepingSpotify(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  let n = tpl.content.querySelector('iframe.spotify');
+  let o = app.querySelector('iframe.spotify');
+  if (!n || !o || n.getAttribute('src') !== o.getAttribute('src')) {
+    app.innerHTML = html;
+    return;
+  }
+  // Se cambia todo lo que rodea al reproductor, nivel por nivel, dejando el iframe en su lugar.
+  while (o !== app) {
+    const op = o.parentNode;
+    const np = n.parentNode;
+    [...op.childNodes].forEach((c) => c !== o && c.remove());
+    let before = true;
+    for (const c of [...np.childNodes]) {
+      if (c === n) before = false;
+      else if (before) op.insertBefore(c, o);
+      else op.appendChild(c);
+    }
+    if (op !== app) for (const a of np.attributes) op.setAttribute(a.name, a.value);
+    o = op;
+    n = np;
+  }
 }
 
 /**
@@ -449,7 +482,7 @@ function renderSong(id, ctx = null, came = null) {
       </div>`
     : '';
 
-  app.innerHTML = `
+  renderKeepingSpotify(`
     ${back}
     ${sourceBanner()}
     ${nav}
@@ -563,7 +596,7 @@ function renderSong(id, ctx = null, came = null) {
       </section>
       ${nextUp}
     </article>
-    ${nav}`;
+    ${nav}`);
 
   const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index }, came);
   const moveKey = (d) => {

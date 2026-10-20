@@ -767,3 +767,4 @@ details.ideas[open] summary { margin-bottom: 12px; }
 .route .row { margin-top: 10px; gap: 8px; flex-wrap: wrap; }
 .button.small { padding: 6px 12px; font-size: 0.85rem; }
 .delcomp { display: block; margin: 28px auto 0; color: var(--bad) !important; border-color: var(--bad) !important; }
+.spotifylink { display: inline-block; margin-top: 6px; }

@@ -317,11 +317,14 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 
 .chord { color: var(--chord); font-weight: 700; }
 
-.cpline { display: inline-block; padding-top: 0.2em; }
+.cpline { display: inline; }
 
-.cp { display: inline-flex; flex-direction: column; vertical-align: bottom; }
+/* El acorde va encima de su palabra; la palabra queda alineada con el resto del renglón. */
+.cp { display: inline-block; vertical-align: baseline; padding-top: 0.2em; }
 
-.cp .chord { padding-right: 0.4em; }
+.cp .chord { display: block; padding-right: 0.25em; }
+
+.w { white-space: pre; }
 
 .section { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--muted); }
 

@@ -74,12 +74,21 @@ export function renderChordSheet(text, shift = 0, flats = false) {
       continue;
     }
     if (/\[[^\]]+\]/.test(raw)) {
-      // Acorde encima de la sílaba donde cae, como en una hoja impresa.
-      const parts = transposeInline(raw, shift, flats).split(/\[([^\]]+)\]/);
-      let html = esc(parts[0]);
-      for (let i = 1; i < parts.length; i += 2) {
-        html += `<span class="cp"><span class="chord">${esc(parts[i])}</span><span>${esc(parts[i + 1]) || ' '}</span></span>`;
-      }
+      // Acorde encima de la sílaba donde cae, como en una hoja impresa. Cada palabra va
+      // junta (nunca se parte), pero el renglón sí puede partirse entre palabras en
+      // pantallas angostas.
+      const html = transposeInline(raw, shift, flats)
+        .split(/(\s+)/)
+        .map((tok) => {
+          if (!tok.includes('[')) return esc(tok);
+          const parts = tok.split(/\[([^\]]+)\]/);
+          let word = esc(parts[0]);
+          for (let i = 1; i < parts.length; i += 2) {
+            word += `<span class="cp"><span class="chord">${esc(parts[i])}</span><span>${esc(parts[i + 1]) || ' '}</span></span>`;
+          }
+          return `<span class="w">${word}</span>`;
+        })
+        .join('');
       out.push(`<span class="cpline">${html}</span>`);
     } else if (isChordLine(raw)) {
       out.push(`<span class="chord">${esc(transposeChordLine(raw, shift, flats))}</span>`);

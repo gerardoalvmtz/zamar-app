@@ -653,3 +653,33 @@ h2.month::first-letter { text-transform: uppercase; }
 
 .nextstrip { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none; font-size: 0.9rem; }
 .nextstrip span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- puentes entre tonos ---------- */
+details.transition { margin: 4px 0 4px 34px; }
+details.transition::before { content: none; }
+details.transition summary { cursor: pointer; list-style: none; }
+details.transition summary::-webkit-details-marker { display: none; }
+details.transition summary::before { content: '↓ '; }
+details.transition[open] summary { color: var(--text); font-weight: 600; }
+details.transition .bridge { margin-top: 8px; font-size: 0.9rem; color: var(--text); }
+
+.bridge { display: grid; gap: 12px; }
+.route { padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.route-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.route .hint { margin: 8px 0 0; }
+.path { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+.path li { display: grid; gap: 2px; min-width: 64px; padding: 8px 10px; border-radius: 12px; background: var(--sunken); text-align: center; }
+.path li + li { position: relative; }
+.path li b { font: 700 1.25rem/1.1 var(--mono); color: var(--chord); }
+.path li small { font-size: 0.68rem; line-height: 1.2; color: var(--muted); }
+.path li.from, .path li.to { background: var(--accent); }
+.path li.from b, .path li.to b { color: var(--on-accent); }
+.path li.from small, .path li.to small { color: var(--on-accent); opacity: 0.7; }
+.bridge .tip { margin: 0; }
+.nextup { margin-top: 24px; padding-top: 4px; border-top: 2px solid var(--line); }
+.nextsong { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; text-decoration: none; }
+.nextup details.more { margin-top: 10px; }
+.nextup details.more summary { cursor: pointer; font-weight: 600; }
+.nextup details.more .bridge { margin-top: 10px; }
+.keypair { margin-top: 16px; }
+.bridgelink { display: block; margin-top: 14px; text-align: center; }

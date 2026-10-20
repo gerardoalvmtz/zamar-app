@@ -322,6 +322,16 @@ const ACTIONS = {
     return { ok: true, audio: audio };
   },
 
+  // El teléfono no siempre puede reproducir el link directo de Drive (sobre todo en iPhone),
+  // así que el audio se manda desde aquí y la app lo toca desde la memoria.
+  getAudio(p) {
+    const id = String(p.fileId || '');
+    const known = records(compSheet('Audios')).some((a) => id && String(a.Link).indexOf(id) >= 0);
+    if (!known) throw new Error('No encontré ese audio.');
+    const blob = DriveApp.getFileById(id).getBlob();
+    return { ok: true, mimeType: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+  },
+
   addComment(p) {
     if (!findById(compSheet('Composiciones'), p.id)) throw new Error('No encontré la composición.');
     const text = String(p.text || '').trim().slice(0, 2000);

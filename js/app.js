@@ -13,6 +13,7 @@ import {
   decodeSetlist,
   importSetlist,
 } from './setlists.js';
+import { canEdit, setupEditing } from './edit.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -248,6 +249,14 @@ function renderList() {
       </div>
       ${state.showFilters ? filterPanel() : ''}
     </div>
+    ${
+      canEdit()
+        ? `<div class="row edittools">
+            <a class="button ghost" href="#/nueva">+ Nueva canción</a>
+            <a class="button ghost" href="#/importar">Importar .cho</a>
+          </div>`
+        : ''
+    }
     <p class="count" id="count"></p>
     <div class="list" id="list"></div>
     <footer class="foot">${state.updatedAt ? `Actualizado ${esc(fmtDate(state.updatedAt))}` : ''}</footer>`;
@@ -347,7 +356,8 @@ function renderSong(id, ctx = null) {
         ${song.themes.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
         ${song.catholic ? '<span class="chip catholic">Católica</span>' : ''}
       </p>
-      <p class="status"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}</p>
+      <p class="status"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}
+        ${canEdit() && !ctx ? `<a class="editlink" href="#/editar/${encodeURIComponent(song.id)}">✎ Editar</a>` : ''}</p>
 
       <section class="card keybox">
         ${
@@ -389,6 +399,14 @@ function renderSong(id, ctx = null) {
         ${viewBody[view]}
       </section>
 
+      ${
+        song.files?.length
+          ? `<section><h2>Archivos</h2><div class="chips">${song.files
+              .filter((f) => safeUrl(f.url))
+              .map((f) => `<a class="chip" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`)
+              .join('')}</div></section>`
+          : ''
+      }
       ${song.notes ? `<section><h2>Notas del equipo</h2><p class="teamnotes">${esc(song.notes)}</p></section>` : ''}
 
       ${
@@ -655,9 +673,16 @@ function renderSetlist(id, shared = null) {
 }
 
 // ---------- navegación ----------
+const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
+
 function route() {
   const h = location.hash;
   let m;
+  if (editing) {
+    if ((m = h.match(/^#\/editar\/(.+)$/))) return () => editing.renderEdit(decodeURIComponent(m[1]));
+    if (h === '#/nueva') return () => editing.renderEdit('');
+    if (h === '#/importar') return editing.renderImport;
+  }
   if ((m = h.match(/^#\/c\/(.+)$/))) return () => renderSong(decodeURIComponent(m[1]));
   if ((m = h.match(/^#\/set\/([^/]+)\/(\d+)$/))) {
     const set = getSetlist(m[1]);

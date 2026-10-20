@@ -77,3 +77,10 @@ test('distingue tonalidad original y de Zamar', () => {
   assert.equal(keyName(b.key), 'Em');
   assert.equal(b.keyZamar, null);
 });
+
+test('lee los archivos adjuntos de la pestaña Letras', async () => {
+  const { rowsToTexts, attachTexts } = await import('../js/songs.js');
+  const songs = rowsToSongs([['Canción'], ['Abba']]);
+  attachTexts(songs, rowsToTexts([['Canción', 'Archivos'], ['Abba', 'Riff.pdf | https://drive.google.com/file/d/x\nmal formato']]));
+  assert.deepEqual(songs[0].files, [{ name: 'Riff.pdf', url: 'https://drive.google.com/file/d/x' }]);
+});

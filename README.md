@@ -54,6 +54,13 @@ transponen al cambiar el tono.
 - Notas personales que se guardan solo en el teléfono de cada quien.
 - Setlists para eventos: se arman en el teléfono, cada canción con su tono, y se comparten con un link.
 
+## Editar desde la app
+
+Con el programa de [`apps-script/`](apps-script/LEEME.md) instalado en el Sheets y su link en `WRITE_URL`
+(`js/config.js`), aparece **✎ Editar** en cada canción, más **Nueva canción** e **Importar .cho** en la lista.
+Se pide un PIN que el ministerio comparte. Todo se guarda en el mismo Sheets y queda registrado en la pestaña
+*Cambios*. Los archivos adjuntos van a una carpeta de Drive y su link se anota en la columna *Archivos* de *Letras*.
+
 ## Publicarla (GitHub Pages, gratis)
 
 En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save**.

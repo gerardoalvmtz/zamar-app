@@ -12,6 +12,8 @@ La hoja debe estar compartida como **"Cualquier persona con el enlace: Lector"**
 app muestra la copia guardada en el teléfono (o la incluida en `data/repertorio.json`) y avisa con un
 letrero amarillo.
 
+Otras columnas como "Acordes actualizados (Songbook)" son de control interno y la app no las muestra.
+
 Columnas que la app reconoce (por nombre, en cualquier orden; las demás se ignoran):
 
 | Columna | Uso |
@@ -24,10 +26,16 @@ Columnas que la app reconoce (por nombre, en cualquier orden; las demás se igno
 | BPM | Número |
 | Estatus | Lista para tocar / Pendiente repaso / ... |
 | Lyrics ProPresenter | Sí / No |
-| Letra y acordes | *(opcional, futura)* Acordes entre corchetes `[G]Santo` o en una línea encima de la letra |
-| Letra | *(opcional)* |
 | Notas | *(opcional)* Notas del equipo, visibles para todos |
 | Link | *(opcional)* Video de referencia |
+
+### Letras y hojas de acordes
+
+Van en una pestaña aparte llamada **Letras** dentro de la misma hoja, para que la pestaña principal
+siga siendo fácil de leer. Columnas: **Canción** (igual que en la pestaña principal), **Letra** y **Acordes**.
+En la app, cada canción tiene dos pestañas, *Letra* y *Acordes*. Los acordes se pueden escribir entre
+corchetes dentro de la letra (`[G]Santo es el [D]Señor`) o en una línea encima de la letra, y se
+transponen al cambiar el tono.
 
 ## Qué hace
 

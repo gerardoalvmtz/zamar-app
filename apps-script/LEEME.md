@@ -43,6 +43,13 @@ Después de pegar el código nuevo, en el editor elige la función **prepararCom
 arriba y toca **▶ Ejecutar**. Google pide permisos otra vez (ahora también para crear la hoja); acéptalos.
 Luego vuelve a implementar como se explica abajo.
 
+## Agenda (privada)
+
+La sección **Agenda** guarda los eventos a los que invitan al ministerio (fecha, horas, lugar, contacto,
+estatus, setlist y notas) y quién va a cada uno. Vive en la misma hoja privada "Zamar · Composiciones",
+en las pestañas *Eventos* y *Asistencia*, que el script crea solo la primera vez que alguien abre la Agenda.
+No hace falta ejecutar nada: basta con pegar el código nuevo y volver a implementar.
+
 ## Si cambias el código
 
 Después de pegar una versión nueva: **Implementar → Administrar implementaciones → editar (lápiz) →

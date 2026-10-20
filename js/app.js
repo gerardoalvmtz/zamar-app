@@ -16,6 +16,7 @@ import {
 import { canEdit } from './api.js';
 import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
+import { setupAgenda } from './agenda.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -108,7 +109,7 @@ async function loadSongs({ quiet = false } = {}) {
     }
   }
   // Una recarga en segundo plano no debe borrar un formulario o una grabación a medias.
-  if (quiet && /^#\/(comp(\/|$)|editar|nueva|importar)/.test(location.hash)) return;
+  if (quiet && /^#\/(comp(\/|$)|agenda\/|editar|nueva|importar)/.test(location.hash)) return;
   render();
 }
 
@@ -154,7 +155,12 @@ function homeHeader(active) {
     <nav class="nav">
       <a href="#/" ${active === 'songs' ? 'aria-current="page"' : ''}>Canciones</a>
       <a href="#/sets" ${active === 'sets' ? 'aria-current="page"' : ''}>Setlists</a>
-      ${canEdit() ? `<a href="#/comp" ${active === 'comps' ? 'aria-current="page"' : ''}>Composiciones</a>` : ''}
+      ${
+        canEdit()
+          ? `<a href="#/agenda" ${active === 'agenda' ? 'aria-current="page"' : ''}>Agenda</a>
+             <a href="#/comp" ${active === 'comps' ? 'aria-current="page"' : ''}>Composiciones</a>`
+          : ''
+      }
     </nav>`;
 }
 
@@ -243,6 +249,7 @@ function renderList() {
   app.innerHTML = `
     ${homeHeader('songs')}
     ${sourceBanner()}
+    ${agenda?.nextBanner() || ''}
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar canción o autor" value="${esc(f.q)}" autocomplete="off">
       <div class="row">
@@ -680,6 +687,7 @@ function renderSetlist(id, shared = null) {
 // ---------- navegación ----------
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
+const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
 function route() {
   const h = location.hash;
@@ -692,6 +700,10 @@ function route() {
     if (h === '#/comp/nueva') return () => comps.renderEdit('');
     if ((m = h.match(/^#\/comp\/([^/]+)\/editar$/))) return () => comps.renderEdit(decodeURIComponent(m[1]));
     if ((m = h.match(/^#\/comp\/([^/]+)$/))) return () => comps.renderOne(decodeURIComponent(m[1]));
+    if (h === '#/agenda') return agenda.renderList;
+    if (h === '#/agenda/nuevo') return () => agenda.renderEdit('');
+    if ((m = h.match(/^#\/agenda\/([^/]+)\/editar$/))) return () => agenda.renderEdit(decodeURIComponent(m[1]));
+    if ((m = h.match(/^#\/agenda\/([^/]+)$/))) return () => agenda.renderOne(decodeURIComponent(m[1]));
   }
   if ((m = h.match(/^#\/c\/(.+)$/))) return () => renderSong(decodeURIComponent(m[1]));
   if ((m = h.match(/^#\/set\/([^/]+)\/(\d+)$/))) {

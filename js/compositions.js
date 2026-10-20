@@ -305,13 +305,22 @@ export function setupCompositions(ctx) {
         draw();
       });
       box.querySelectorAll('[data-play]').forEach((b) =>
-        b.addEventListener('click', () => {
+        b.addEventListener('click', async () => {
           stopPlaying();
-          const secs = playProgression(items[b.dataset.play].chords, bpm || 72);
-          box.querySelectorAll('[data-play]').forEach((x) => (x.textContent = '▶ Escuchar'));
-          b.textContent = '♪ Sonando…';
-          clearTimeout(b._t);
-          b._t = setTimeout(() => (b.textContent = '▶ Escuchar'), secs * 1000);
+          box.querySelectorAll('[data-play]').forEach((x) => {
+            clearTimeout(x._t);
+            x.textContent = '▶ Escuchar';
+          });
+          b.textContent = 'Cargando piano…';
+          try {
+            const secs = await playProgression(items[b.dataset.play].chords, bpm || 72);
+            if (!secs) return void (b.textContent = '▶ Escuchar');
+            b.textContent = '♪ Sonando…';
+            b._t = setTimeout(() => (b.textContent = '▶ Escuchar'), secs * 1000);
+          } catch {
+            b.textContent = '▶ Escuchar';
+            alert('No pude cargar el sonido del piano. Revisa tu conexión e intenta otra vez.');
+          }
         }),
       );
       box.querySelectorAll('[data-insert]').forEach((b) =>

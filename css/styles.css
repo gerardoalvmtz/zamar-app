@@ -749,3 +749,20 @@ details.thread summary{cursor:pointer;font-size:.9rem;opacity:.85}
 .qrbox canvas { width: 100%; max-width: 320px; height: auto; border-radius: 12px; }
 .setactions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .setactions > * { width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Ideas de progresiones (Composiciones) */
+.ideaslink { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--sunken); color: var(--text); text-decoration: none; font-size: 1.4rem; }
+.ideaslink span { display: grid; gap: 2px; font-size: 1rem; }
+.ideaslink small { font-size: 0.82rem; color: var(--muted); }
+details.ideas { margin: 18px 0; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: var(--surface); }
+details.ideas summary { cursor: pointer; font-weight: 600; }
+details.ideas[open] summary { margin-bottom: 12px; }
+.moods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.moods button { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-size: 0.9rem; }
+.moods button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.field.inline { display: flex; align-items: center; gap: 10px; }
+.field.inline select { width: auto; min-width: 90px; }
+.moodabout { margin: 12px 0; font-size: 0.92rem; line-height: 1.45; }
+.moodabout .muted { color: var(--muted); }
+.route .row { margin-top: 10px; gap: 8px; flex-wrap: wrap; }
+.button.small { padding: 6px 12px; font-size: 0.85rem; }

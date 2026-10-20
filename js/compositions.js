@@ -2,10 +2,12 @@
 // No están en la hoja pública; se leen y guardan a través del Apps Script con el PIN.
 import { setupApi, readBase64 } from './api.js';
 import { keyName, parseKey, transposeKey, semitonesBetween, useFlats } from './music.js';
+import { MOODS, suggest, toChordPro, playProgression, stopPlaying } from './progressions.js';
 import { renderChordSheet, renderLyrics, lyricsFromChords, sheetKey, metadata } from './chordpro.js';
 
 export const STAGES = ['Idea', 'En proceso', 'Terminada', 'En repertorio'];
 const MAX_AUDIO = 25 * 1024 * 1024;
+const ALL_KEYS = [false, true].flatMap((minor) => Array.from({ length: 12 }, (_, pc) => ({ pc, minor })));
 
 /** ctx: { app, store, esc, backHeader, homeHeader, loadSongs } desde app.js */
 export function setupCompositions(ctx) {
@@ -89,6 +91,7 @@ export function setupCompositions(ctx) {
           <a class="button ghost" href="#/comp/nueva">+ Nueva idea</a>
           <button class="button ghost" data-action="comp-reload">⟳ Actualizar</button>
         </div>
+        <a class="ideaslink" href="#/comp/ideas">💡 <span><strong>Ideas de progresiones</strong><small>Dime el ánimo y el tono, y te sugiero acordes</small></span></a>
         <div class="list">
           ${
             items.length
@@ -201,6 +204,8 @@ export function setupCompositions(ctx) {
             }
           </section>
 
+          <details class="ideas"><summary>💡 Ideas de progresiones</summary><div data-ideas></div></details>
+
           ${c.notes ? `<section><h2>Notas</h2><p class="teamnotes">${esc(c.notes)}</p></section>` : ''}
 
           <section>
@@ -232,6 +237,7 @@ export function setupCompositions(ctx) {
       );
       setupAudio(c);
       setupComments(c);
+      ideas(app.querySelector('[data-ideas]'), { key, bpm: c.bpm });
       app.querySelector('[data-action="promote"]')?.addEventListener('click', async (e) => {
         if (!confirm(`¿Agregar “${c.title}” al repertorio?`)) return;
         e.target.disabled = true;
@@ -248,6 +254,87 @@ export function setupCompositions(ctx) {
         }
       });
     });
+  }
+
+  // ---------- ideas de progresiones ----------
+  /** Panel de ánimo + tono → progresiones. insert(texto) si se pueden pegar en los acordes. */
+  function ideas(box, { key, bpm, insert, title } = {}) {
+    if (!box) return;
+    let moodId = store.get('zamar:mood', MOODS[0].id);
+    let k = key || ALL_KEYS.find((x) => keyName(x) === store.get('zamar:moodkey', 'G')) || ALL_KEYS[7];
+    const draw = () => {
+      const { mood, items, tip } = suggest(moodId, k);
+      box.innerHTML = `
+        ${title ? `<p class="hint">${title}</p>` : ''}
+        <div class="moods" role="radiogroup" aria-label="Ánimo de la canción">
+          ${MOODS.map((m) => `<button type="button" role="radio" data-mood="${m.id}" aria-checked="${m.id === mood.id}">${m.emoji} ${esc(m.name)}</button>`).join('')}
+        </div>
+        <label class="field inline"><span>Tono</span><select data-ideakey>${ALL_KEYS.map(
+          (x) => `<option ${keyName(x) === keyName(k) ? 'selected' : ''}>${keyName(x)}</option>`,
+        ).join('')}</select></label>
+        <p class="moodabout">${esc(mood.about)} <span class="muted">Tempo sugerido: ${mood.bpm} BPM.</span></p>
+        <div class="bridge">
+          ${items
+            .map(
+              (p, i) => `<div class="route">
+                <div class="route-head"><strong>${esc(p.name)}</strong><span class="pill">${esc(p.section)}</span></div>
+                <ol class="path">${p.chords.map((c) => `<li><b>${esc(c.chord)}</b><small>${esc(c.deg)}</small></li>`).join('')}</ol>
+                <p class="hint">${esc(p.why)}</p>
+                <div class="row">
+                  <button type="button" class="button ghost small" data-play="${i}">▶ Escuchar</button>
+                  ${insert ? `<button type="button" class="button ghost small" data-insert="${i}">+ Agregar a acordes</button>` : ''}
+                </div>
+              </div>`,
+            )
+            .join('')}
+          ${tip ? `<p class="hint tip">💡 ${esc(tip)}</p>` : ''}
+          <p class="hint">Cada acorde dura un compás. Repite la progresión 2 o 4 veces por sección; los números (I, IV, vi…) dicen qué lugar ocupa cada acorde en el tono, así funciona igual si luego cambias de tono.</p>
+        </div>`;
+      box.querySelectorAll('[data-mood]').forEach((b) =>
+        b.addEventListener('click', () => {
+          moodId = b.dataset.mood;
+          store.set('zamar:mood', moodId);
+          stopPlaying();
+          draw();
+        }),
+      );
+      box.querySelector('[data-ideakey]').addEventListener('change', (e) => {
+        k = ALL_KEYS.find((x) => keyName(x) === e.target.value);
+        store.set('zamar:moodkey', e.target.value);
+        stopPlaying();
+        draw();
+      });
+      box.querySelectorAll('[data-play]').forEach((b) =>
+        b.addEventListener('click', () => {
+          stopPlaying();
+          const secs = playProgression(items[b.dataset.play].chords, bpm || 72);
+          box.querySelectorAll('[data-play]').forEach((x) => (x.textContent = '▶ Escuchar'));
+          b.textContent = '♪ Sonando…';
+          clearTimeout(b._t);
+          b._t = setTimeout(() => (b.textContent = '▶ Escuchar'), secs * 1000);
+        }),
+      );
+      box.querySelectorAll('[data-insert]').forEach((b) =>
+        b.addEventListener('click', () => {
+          insert(toChordPro(items[b.dataset.insert], mood));
+          b.textContent = '✓ Agregada';
+        }),
+      );
+    };
+    draw();
+  }
+
+  function renderIdeas() {
+    document.title = 'Ideas de progresiones · Zamar';
+    stopPlaying();
+    app.innerHTML = `${backHeader('#/comp', 'Composiciones')}
+      <article class="detail">
+        <h1>Ideas de progresiones</h1>
+        <p class="author">Elige cómo quieres que se sienta la canción y en qué tono. Escucha las opciones y quédate con la que te inspire.</p>
+        <div data-ideas></div>
+        <p><a class="button ghost" href="#/comp/nueva">+ Empezar una idea nueva</a></p>
+      </article>`;
+    ideas(app.querySelector('[data-ideas]'));
   }
 
   // ---------- comentarios ----------
@@ -403,6 +490,7 @@ export function setupCompositions(ctx) {
           <label class="field"><span>Letra</span><textarea name="Letra" rows="8" spellcheck="true" class="prose">${esc(v.lyrics)}</textarea></label>
           <label class="field"><span>Acordes (ChordPro) <button type="button" class="link" data-pick="cho">Cargar .cho</button></span>
             <textarea name="Acordes" rows="10" spellcheck="false" placeholder="[G]Primera [D]línea del coro…">${esc(v.chords)}</textarea></label>
+          <details class="ideas"><summary>💡 ¿No sabes qué acordes usar? Ideas de progresiones</summary><div data-ideas></div></details>
           <input type="file" id="chofile" accept=".cho,.chopro,.chordpro,.crd,.txt,text/plain" hidden>
           <label class="field"><span>Notas</span><textarea name="Notas" rows="4" spellcheck="true" class="prose" placeholder="Ideas pendientes, estructura, quién hace qué…">${esc(v.notes)}</textarea></label>
           <p class="hint" id="editmsg"></p>
@@ -413,6 +501,19 @@ export function setupCompositions(ctx) {
         </form>`;
       const form = app.querySelector('#editor');
       const msg = (t) => (app.querySelector('#editmsg').textContent = t);
+      const ideasBox = app.querySelector('[data-ideas]');
+      const ideasHere = () =>
+        ideas(ideasBox, {
+          key: parseKey(form.elements.Tono.value),
+          bpm: parseInt(form.elements.BPM.value, 10) || null,
+          insert: (text) => {
+            const t = form.elements.Acordes;
+            t.value = (t.value.trim() ? t.value.replace(/\s*$/, '\n\n') : '') + text;
+            msg('Agregué la progresión al final de los acordes. Toca Guardar para conservarla.');
+          },
+        });
+      ideasHere();
+      form.elements.Tono.addEventListener('change', ideasHere);
       app.querySelector('[data-pick="cho"]').addEventListener('click', () => app.querySelector('#chofile').click());
       app.querySelector('#chofile').addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -451,5 +552,5 @@ export function setupCompositions(ctx) {
     });
   }
 
-  return { renderList, renderOne, renderEdit };
+  return { renderList, renderOne, renderEdit, renderIdeas };
 }

@@ -1066,6 +1066,7 @@ function route() {
     if (h === '#/importar') return editing.renderImport;
     if (h === '#/comp') return comps.renderList;
     if (h === '#/comp/nueva') return () => comps.renderEdit('');
+    if (h === '#/comp/ideas') return comps.renderIdeas;
     if ((m = h.match(/^#\/comp\/([^/]+)\/editar$/))) return () => comps.renderEdit(decodeURIComponent(m[1]));
     if ((m = h.match(/^#\/comp\/([^/]+)$/))) return () => comps.renderOne(decodeURIComponent(m[1]));
     if (h === '#/agenda') return agenda.renderList;

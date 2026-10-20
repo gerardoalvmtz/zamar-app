@@ -1,6 +1,6 @@
 // Guarda la app en el teléfono para que abra sin internet.
 // Los datos de la hoja los maneja app.js (siempre intenta la versión en vivo primero).
-const VERSION = 'zamar-v7';
+const VERSION = 'zamar-v8';
 const SHELL = [
   './',
   'index.html',
@@ -14,6 +14,7 @@ const SHELL = [
   'js/api.js',
   'js/edit.js',
   'js/compositions.js',
+  'js/agenda.js',
   'data/repertorio.json',
   'manifest.webmanifest',
   'img/logo-negro.png',

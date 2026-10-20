@@ -69,6 +69,15 @@ de referencia de cada momento, que se graban desde el teléfono o se suben como 
 Cuando una está *Terminada*, el botón **Pasar al repertorio** la agrega a la lista de canciones con su letra
 y acordes. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
 
+### Agenda
+
+También con PIN. Cada evento lleva tipo, estatus (Invitación recibida, Pendiente de detalles, Confirmado,
+Realizado, Cancelado), fecha, hora de llegada, inicio y fin, lugar, contacto y notas. Arriba se ve el
+**próximo evento** con su cuenta regresiva y quién va; la lista se puede ver por mes o como calendario.
+En cada evento cada quien marca **Voy / Tal vez / No puedo** con lo que toca, se puede vincular un setlist,
+compartir el resumen por WhatsApp, agregarlo al calendario del teléfono y abrir el lugar en Maps.
+El próximo evento también aparece como aviso en la pantalla de canciones (con la última copia guardada).
+
 ## Publicarla (GitHub Pages, gratis)
 
 En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save**.

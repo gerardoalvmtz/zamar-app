@@ -16,6 +16,17 @@ const AUDIO_FOLDER = 'Zamar · Audios de composiciones';
 const COMP_HEADERS = ['ID', 'Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas', 'Creada', 'Actualizada'];
 const AUDIO_HEADERS = ['Composición', 'Etiqueta', 'Archivo', 'Link', 'Fecha', 'Quién'];
 const COMP_EDITABLE = ['Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas'];
+// La agenda vive en el mismo archivo privado, en sus propias pestañas (se crean solas).
+const EVENT_HEADERS = [
+  'ID', 'Evento', 'Tipo', 'Estatus', 'Fecha', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección',
+  'Contacto', 'Teléfono', 'Setlist', 'Notas', 'Creado', 'Actualizado',
+];
+const EVENT_EDITABLE = EVENT_HEADERS.filter((h) => ['ID', 'Creado', 'Actualizado'].indexOf(h) < 0);
+// Se guardan como texto para que la hoja no las convierta en fechas u horas con otra zona horaria.
+const EVENT_TEXT = ['Fecha', 'Hora', 'Llegada', 'Fin', 'Teléfono'];
+const RSVP_HEADERS = ['Evento', 'Quién', 'Respuesta', 'Rol', 'Fecha'];
+const RSVP_ANSWERS = ['Voy', 'Tal vez', 'No puedo'];
+const PRIVATE_TABS = { Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS };
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -51,6 +62,7 @@ function cambiarPin() {
  */
 function prepararComposiciones() {
   const ss = compositionsFile();
+  Object.keys(PRIVATE_TABS).forEach(compSheet);
   filesFolder(AUDIO_FOLDER);
   Logger.log('Listo: ' + ss.getUrl());
 }
@@ -105,7 +117,7 @@ function log(action, title, detail, who) {
   sheet.appendRow([new Date(), who || '', action, title || '', String(detail || '').slice(0, 500)]);
 }
 
-function writeFields(sheet, row, fields, allowed) {
+function writeFields(sheet, row, fields, allowed, asText) {
   const changed = [];
   Object.keys(fields || {}).forEach((name) => {
     if (!allowed.some((a) => normalize(a) === normalize(name))) return;
@@ -113,7 +125,10 @@ function writeFields(sheet, row, fields, allowed) {
     const value = fields[name] == null ? '' : String(fields[name]);
     // El texto que empieza con = + - @ se guarda tal cual, nunca como fórmula.
     // Los números se guardan como número para que la app los lea igual que los escritos a mano.
-    const cellValue = /^\d+(\.\d+)?$/.test(value) ? Number(value) : /^[=+\-@]/.test(value) ? "'" + value : value;
+    const text = (asText || []).some((a) => normalize(a) === normalize(name));
+    const cellValue = text && value
+      ? "'" + value
+      : /^\d+(\.\d+)?$/.test(value) ? Number(value) : /^[=+\-@]/.test(value) ? "'" + value : value;
     sheet.getRange(row, col).setValue(cellValue);
     changed.push(name);
   });
@@ -146,7 +161,20 @@ function compositionsFile() {
 }
 
 function compSheet(name) {
-  return compositionsFile().getSheetByName(name);
+  const ss = compositionsFile();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(PRIVATE_TABS[name]);
+  }
+  return sheet;
+}
+
+/** Las fechas y horas escritas a mano en la hoja llegan a la app como texto legible. */
+function cellText(v) {
+  if (!(v instanceof Date)) return v;
+  if (v.getFullYear() < 1900) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+  return v.toISOString();
 }
 
 /** Filas de una pestaña como objetos { encabezado: valor }. */
@@ -156,7 +184,7 @@ function records(sheet) {
   const h = headers(sheet);
   return sheet.getRange(2, 1, last - 1, h.length).getValues().map((row) => {
     const o = {};
-    h.forEach((name, i) => (o[name] = row[i] instanceof Date ? row[i].toISOString() : row[i]));
+    h.forEach((name, i) => (o[name] = cellText(row[i])));
     return o;
   });
 }
@@ -242,7 +270,8 @@ const ACTIONS = {
     let id = p.id;
     if (!row) {
       if (!String((p.fields || {})['Título'] || '').trim()) throw new Error('Falta el título.');
-      id = Utilities.getUuid().slice(0, 8);
+      // Con letra al inicio para que la hoja nunca lo lea como número (por ejemplo 1e234567).
+      id = 'c' + Utilities.getUuid().slice(0, 8);
       row = sheet.getLastRow() + 1;
       sheet.getRange(row, column(sheet, 'ID', true)).setValue(id);
       sheet.getRange(row, column(sheet, 'Creada', true)).setValue(now);
@@ -295,6 +324,68 @@ const ACTIONS = {
     ACTIONS.updateTexts({ who: p.who, title: title, fields: { Letra: c.Letra, Acordes: c.Acordes } });
     writeFields(sheet, row, { Estado: 'En repertorio' }, COMP_EDITABLE);
     return { ok: true, title: title };
+  },
+
+  // ---------- agenda ----------
+  listAgenda() {
+    return { ok: true, events: records(compSheet('Eventos')), rsvps: records(compSheet('Asistencia')) };
+  },
+
+  saveEvent(p) {
+    const sheet = compSheet('Eventos');
+    let row = findById(sheet, p.id);
+    const now = new Date();
+    let id = p.id;
+    if (!row) {
+      if (!String((p.fields || {}).Evento || '').trim()) throw new Error('Falta el nombre del evento.');
+      id = 'e' + Utilities.getUuid().slice(0, 8);
+      row = sheet.getLastRow() + 1;
+      sheet.getRange(row, column(sheet, 'ID', true)).setValue(id);
+      sheet.getRange(row, column(sheet, 'Creado', true)).setValue(now);
+    }
+    const changed = writeFields(sheet, row, p.fields, EVENT_EDITABLE, EVENT_TEXT);
+    sheet.getRange(row, column(sheet, 'Actualizado', true)).setValue(now);
+    log('Agenda', (p.fields || {}).Evento || id, changed.join(', '), p.who);
+    return { ok: true, id: id };
+  },
+
+  deleteEvent(p) {
+    const sheet = compSheet('Eventos');
+    const row = findById(sheet, p.id);
+    if (!row) throw new Error('No encontré el evento.');
+    const title = records(sheet)[row - 2].Evento;
+    sheet.deleteRow(row);
+    const rsvps = compSheet('Asistencia');
+    for (let r = rsvps.getLastRow(); r >= 2; r--) {
+      if (String(rsvps.getRange(r, 1).getValue()) === String(p.id)) rsvps.deleteRow(r);
+    }
+    log('Borrar evento', title, '', p.who);
+    return { ok: true };
+  },
+
+  /** Quién va a un evento. Una fila por persona; respuesta vacía la quita. */
+  rsvp(p) {
+    if (!findById(compSheet('Eventos'), p.id)) throw new Error('No encontré el evento.');
+    const name = String(p.name || '').trim().slice(0, 80);
+    if (!name) throw new Error('Falta el nombre.');
+    const answer = String(p.answer || '');
+    if (answer && RSVP_ANSWERS.indexOf(answer) < 0) throw new Error('Respuesta no válida.');
+    const sheet = compSheet('Asistencia');
+    let row = 0;
+    for (let r = 2; r <= sheet.getLastRow(); r++) {
+      const v = sheet.getRange(r, 1, 1, 2).getValues()[0];
+      if (String(v[0]) === String(p.id) && normalize(v[1]) === normalize(name)) row = r;
+    }
+    if (!answer) {
+      if (row) sheet.deleteRow(row);
+      return { ok: true, rsvp: null };
+    }
+    const rsvp = { Evento: p.id, 'Quién': name, Respuesta: answer, Rol: String(p.role || '').slice(0, 60), Fecha: new Date().toISOString() };
+    const values = [RSVP_HEADERS.map((h) => (h === 'Quién' || h === 'Rol') && /^[=+\-@]/.test(rsvp[h]) ? "'" + rsvp[h] : rsvp[h])];
+    if (row) sheet.getRange(row, 1, 1, RSVP_HEADERS.length).setValues(values);
+    else sheet.appendRow(values[0]);
+    log('Asistencia', p.id, name + ': ' + answer, p.who);
+    return { ok: true, rsvp: rsvp };
   },
 };
 

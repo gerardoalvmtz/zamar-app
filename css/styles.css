@@ -338,3 +338,164 @@ textarea { resize: vertical; }
   text-decoration: none;
   font-weight: 600;
 }
+
+/* ---------- navegación principal ---------- */
+.nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+}
+
+.nav a {
+  text-align: center;
+  padding: 8px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.nav a[aria-current='page'] { background: var(--accent); color: var(--on-accent); }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ---------- filtros múltiples ---------- */
+.filter-toggle { border-radius: 12px; text-align: left; padding: 11px 14px; font-weight: 600; }
+
+.filter-toggle[aria-expanded='true'] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.panel fieldset { border: 0; margin: 0; padding: 0; }
+
+.panel legend {
+  margin-bottom: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel .chips { margin: 0; }
+
+.panel .link { justify-self: start; }
+
+.chip.toggle { cursor: pointer; padding: 6px 12px; font-size: 0.85rem; }
+
+.chip.toggle[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+/* ---------- ficha ---------- */
+.voice { margin: 6px 0 0; font-size: 0.92rem; }
+
+.basesel {
+  grid-column: 1 / -1;
+  order: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--on-accent) 30%, transparent);
+}
+
+.basesel button { border: 0; background: transparent; color: inherit; font-size: 0.85rem; font-weight: 600; opacity: 0.7; }
+
+.basesel button[aria-selected='true'] { background: var(--on-accent); color: var(--accent); opacity: 1; }
+
+.listen { margin-top: 14px; }
+
+.spotify { display: block; width: 100%; border: 0; border-radius: 12px; }
+
+.sheet .block { margin: 6px 0; }
+
+.sheet .block.chorus { padding-left: 12px; border-left: 3px solid var(--chord); }
+
+.sheet .block.tab { white-space: pre; overflow-x: auto; }
+
+.button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+
+.setnav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.setnav a:last-child { justify-self: end; }
+
+.addset { grid-template-columns: 1fr auto; }
+
+/* ---------- setlists ---------- */
+.newset { display: grid; gap: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+
+.newset h2 { margin: 0; }
+
+.newset input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 11px 14px; }
+
+.title-input {
+  width: 100%;
+  margin-top: 18px;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  background: transparent;
+  font: 600 1.7rem/1.2 var(--serif);
+  padding: 4px 0;
+}
+
+#sdate {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px 10px;
+}
+
+.setlist { list-style: none; margin: 16px 0; padding: 0; }
+
+.transition {
+  display: block;
+  margin: 2px 0 2px 34px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.transition::before { content: '↓ '; }
+
+.setrow {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.setrow .song-main { text-decoration: none; }
+
+.setrow .num { font: 600 1.1rem/1 var(--serif); color: var(--muted); }
+
+.setctl { grid-column: 2 / -1; display: flex; gap: 6px; }
+
+.setctl button { padding: 4px 12px; font-size: 0.85rem; }
+
+.setctl button:disabled { opacity: 0.35; }
+
+.actions { grid-template-columns: repeat(3, auto); justify-content: start; margin-top: 16px; }
+
+.danger { color: var(--bad); }
+
+#sharemsg input { width: 100%; margin-top: 6px; }

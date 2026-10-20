@@ -81,6 +81,13 @@ export function decodeSetlist(code) {
   }
 }
 
+/** Copia un setlist con sus canciones y tonos, como "(copia)" y sin fecha para ponerle la nueva. */
+export function duplicateSetlist(id) {
+  const set = getSetlist(id);
+  if (!set) return null;
+  return saveSetlist({ id: newId(), name: `${set.name} (copia)`, date: '', items: set.items.map((x) => ({ ...x })) });
+}
+
 /** Guarda en este teléfono un setlist recibido por link. */
 export function importSetlist(shared) {
   return saveSetlist({ ...shared, id: newId() });

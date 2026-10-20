@@ -56,7 +56,7 @@ transponen al cambiar el tono.
 - Notas personales que se guardan solo en el teléfono de cada quien.
 - Setlists para eventos: se arman en el teléfono buscando la canción por nombre o por tema y eligiendo el tono
   (el de Zamar por defecto). Se comparten con un link, como imagen PNG (canciones, tonos y BPM) o como PDF con
-  las letras, una canción por página. El PDF usa [jsPDF](https://github.com/parallax/jsPDF) (MIT, en `js/vendor/`).
+  las letras, una canción por página. **Duplicar** copia un setlist con sus tonos para reutilizarlo. El PDF usa [jsPDF](https://github.com/parallax/jsPDF) (MIT, en `js/vendor/`).
 
 ## Editar desde la app
 

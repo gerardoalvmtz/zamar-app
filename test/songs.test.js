@@ -59,3 +59,8 @@ test('toma letra y acordes de la pestaña "Letras"', async () => {
   // Si Google devuelve la pestaña principal en lugar de "Letras", se ignora.
   assert.equal(rowsToTexts([['Canción', 'Estatus', 'Letra'], ['Abba', 'Lista', 'x']]).size, 0);
 });
+
+test('lee la voz principal', () => {
+  const songs = rowsToSongs([['Canción', 'Voz Principal'], ['Entraré', 'Ambos']]);
+  assert.equal(songs[0].voice, 'Ambos');
+});

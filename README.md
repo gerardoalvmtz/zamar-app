@@ -5,7 +5,8 @@ se puede instalar en la pantalla de inicio y funciona sin internet. Nadie necesi
 
 ## De dónde salen las canciones
 
-La app lee en vivo la hoja de Google **"Repertorio Canciones Rise Up"**. Para agregar o corregir una
+La app lee en vivo la hoja de Google **"Repertorio Canciones Rise Up"**, pestañas **RESUMEN** y **Letras**
+(se identifican por su número `gid` en `js/config.js`, así que se pueden renombrar). Para agregar o corregir una
 canción solo se edita la hoja; los teléfonos ven el cambio la próxima vez que abren la app o tocan ⟳.
 
 La hoja debe estar compartida como **"Cualquier persona con el enlace: Lector"**. Si no lo está, la
@@ -21,6 +22,7 @@ Columnas que la app reconoce (por nombre, en cualquier orden; las demás se igno
 | Canción | Título (obligatoria) |
 | Autor | |
 | Temas | Varios separados con ` / `. Se vuelven filtros |
+| Voz Principal | Hombre / Mujer / Ambos |
 | Católica? | Sí / No |
 | Tonalidad | `G`, `Bb`, `F#m`, `Em`... También acepta `Sol`, `Re menor` |
 | BPM | Número |

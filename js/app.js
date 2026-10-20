@@ -18,6 +18,7 @@ import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
+import { setlistImage, setlistPdf, shareFile } from './setshare.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -654,9 +655,7 @@ function renderSetlist(id, shared = null) {
   }
   document.title = `${set.name} · Zamar`;
   const rows = setItems(set);
-  const songOptions = sortedSongs(state.songs)
-    .map((s) => `<option value="${esc(s.id)}">${esc(s.title)}${s.key ? ` (${esc(keyName(s.key))})` : ''}</option>`)
-    .join('');
+  const themes = [...new Set(state.songs.flatMap((s) => s.themes))].sort((a, b) => a.localeCompare(b, 'es'));
 
   app.innerHTML = `
     ${backHeader('#/sets', 'Setlists')}
@@ -710,13 +709,19 @@ function renderSetlist(id, shared = null) {
       ${
         shared
           ? ''
-          : `<div class="row addset">
-              <select id="addsong" aria-label="Canción">${songOptions}</select>
-              <button data-action="addsong">Agregar</button>
-            </div>
+          : `<section class="addpanel">
+              <h2>Agregar canción</h2>
+              <input id="addq" type="search" placeholder="Busca por título o autor" autocomplete="off" value="${esc(addState.q)}">
+              <select id="addtheme" aria-label="Tema">
+                <option value="">Todos los temas</option>
+                ${themes.map((t) => `<option ${t === addState.theme ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+              </select>
+              <ul class="addresults" id="addresults"></ul>
+            </section>
             <div class="row actions">
               ${rows.length ? `<a class="button" href="#/set/${set.id}/0">Tocar</a>` : ''}
-              <button data-action="share">Compartir</button>
+              <button data-action="share">Compartir link</button>
+              ${rows.length ? '<button data-action="image">🖼 Imagen</button><button data-action="pdf">📄 PDF con letras</button>' : ''}
               <button class="danger" data-action="delete">Borrar</button>
             </div>
             <p class="hint" id="sharemsg"></p>`
@@ -748,10 +753,31 @@ function renderSetlist(id, shared = null) {
   app.querySelectorAll('[data-remove]').forEach((b) =>
     b.addEventListener('click', () => update((s) => s.items.splice(Number(b.dataset.remove), 1))),
   );
-  app.querySelector('[data-action="addsong"]').addEventListener('click', () => {
-    const song = songById(app.querySelector('#addsong').value);
-    if (song) update((s) => s.items.push({ id: song.id, key: song.key ? keyName(song.key) : '' }));
-  });
+  setupAddPanel(set, update);
+  const fileRows = () =>
+    setItems(set).map(({ song, key }) => ({
+      title: song ? song.title : 'Canción no encontrada',
+      author: song?.author || '',
+      key: key ? keyName(key) : '',
+      bpm: song?.bpm || '',
+      lyrics: song ? song.lyrics || lyricsFromChords(song.chords) : '',
+    }));
+  const fileAction = (name, label, make, ext, mime) =>
+    app.querySelector(`[data-action="${name}"]`)?.addEventListener('click', async (e) => {
+      const button = e.currentTarget;
+      const msg = document.getElementById('sharemsg');
+      button.disabled = true;
+      msg.textContent = `Preparando ${label}…`;
+      try {
+        const how = await shareFile(await make(set, fileRows()), set, ext, mime);
+        msg.textContent = how === 'downloaded' ? `Listo: se descargó ${label}.` : '';
+      } catch (err) {
+        msg.textContent = err.message || `No se pudo generar ${label}.`;
+      }
+      button.disabled = false;
+    });
+  fileAction('image', 'la imagen', setlistImage, 'png', 'image/png');
+  fileAction('pdf', 'el PDF', setlistPdf, 'pdf', 'application/pdf');
   app.querySelector('[data-action="delete"]').addEventListener('click', () => {
     if (!confirm(`¿Borrar “${set.name}” de este teléfono?`)) return;
     deleteSetlist(set.id);
@@ -771,6 +797,85 @@ function renderSetlist(id, shared = null) {
       document.getElementById('sharemsg').innerHTML = `Copia este link: <input readonly value="${esc(url)}">`;
     }
   });
+}
+
+// Búsqueda para agregar canciones al setlist; se recuerda entre cada cambio de la lista.
+const addState = { q: '', theme: '', pick: '' };
+
+function setupAddPanel(set, update) {
+  const q = app.querySelector('#addq');
+  const theme = app.querySelector('#addtheme');
+  const list = app.querySelector('#addresults');
+  if (!q) return;
+  const inSet = new Set(set.items.map((x) => x.id));
+  const draw = () => {
+    const words = normalize(addState.q).split(/\s+/).filter(Boolean);
+    if (!words.length && !addState.theme) {
+      list.innerHTML = '<li class="hint">Escribe un nombre o elige un tema.</li>';
+      return;
+    }
+    const found = sortedSongs(
+      state.songs.filter((s) => {
+        const text = normalize(`${s.title} ${s.author}`);
+        return words.every((w) => text.includes(w)) && (!addState.theme || s.themes.includes(addState.theme));
+      }),
+    ).slice(0, 40);
+    list.innerHTML = found.length
+      ? found
+          .map((s) => {
+            const open = addState.pick === s.id;
+            const keys = s.key ? Array.from({ length: 12 }, (_, n) => transposeKey(s.key, n - 5)) : [];
+            return `<li class="${open ? 'open' : ''}">
+              <button class="addpick" data-pick="${esc(s.id)}">
+                <span class="song-main">
+                  <span class="song-title">${esc(s.title)}${inSet.has(s.id) ? ' <small class="hint">· ya está</small>' : ''}</span>
+                  <span class="song-sub">${esc(s.author || '')}</span>
+                </span>
+                <span class="song-meta">${s.key ? `<span class="key">${esc(keyName(s.key))}</span>` : ''}${s.bpm ? `<span class="bpm">${s.bpm}</span>` : ''}</span>
+              </button>
+              ${
+                open
+                  ? `<div class="row addkey">
+                      <label>Tono
+                        <select id="addkeysel">${
+                          keys.length
+                            ? keys.map((k) => `<option value="${esc(keyName(k))}" ${keyName(k) === keyName(s.key) ? 'selected' : ''}>${esc(keyName(k))}${keyName(k) === keyName(s.key) ? (s.keyZamar ? ' (Zamar)' : ' (original)') : ''}</option>`).join('')
+                            : '<option value="">Sin tono</option>'
+                        }</select>
+                      </label>
+                      <button data-addsong="${esc(s.id)}">Agregar</button>
+                    </div>`
+                  : ''
+              }
+            </li>`;
+          })
+          .join('')
+      : '<li class="hint">No encontré canciones con esa búsqueda.</li>';
+    list.querySelectorAll('[data-pick]').forEach((b) =>
+      b.addEventListener('click', () => {
+        addState.pick = addState.pick === b.dataset.pick ? '' : b.dataset.pick;
+        draw();
+      }),
+    );
+    list.querySelector('[data-addsong]')?.addEventListener('click', (e) => {
+      const key = list.querySelector('#addkeysel').value;
+      const id = e.currentTarget.dataset.addsong;
+      addState.pick = '';
+      update((s) => s.items.push({ id, key }));
+      document.getElementById('sharemsg').textContent = `Agregada: ${songById(id)?.title || ''}`;
+    });
+  };
+  q.addEventListener('input', () => {
+    addState.q = q.value;
+    addState.pick = '';
+    draw();
+  });
+  theme.addEventListener('change', () => {
+    addState.theme = theme.value;
+    addState.pick = '';
+    draw();
+  });
+  draw();
 }
 
 // ---------- puente entre dos tonos ----------

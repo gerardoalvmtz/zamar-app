@@ -721,3 +721,16 @@ details.transition .bridge { margin-top: 8px; font-size: 0.9rem; color: var(--te
 .commentform textarea{flex:1;min-width:0;resize:vertical}
 details.thread{margin-top:.4rem}
 details.thread summary{cursor:pointer;font-size:.9rem;opacity:.85}
+
+/* Agregar canción al setlist */
+.addpanel { margin-top: 22px; display: grid; gap: 10px; }
+.addpanel h2 { margin: 0; }
+.addresults { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.addresults > li { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.addresults > li.hint { border: 0; background: none; padding: 4px 2px; }
+.addresults > li.open { border-color: var(--text); }
+.addpick { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; background: none; border: 0; border-radius: 0; color: inherit; text-align: left; font: inherit; }
+.addpick .song-main { flex: 1; min-width: 0; }
+.addkey { padding: 0 12px 12px; align-items: end; }
+.addkey label { flex: 1; display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.actions { flex-wrap: wrap; }

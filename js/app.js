@@ -22,6 +22,7 @@ import { canEdit, setupApi, readBase64 } from './api.js';
 import { setupEditing } from './edit.js';
 import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
+import { setupRehearsals } from './rehearsals.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
 import { setlistImage, setlistPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
@@ -564,6 +565,7 @@ function renderSong(id, ctx = null, came = null) {
       ${cameFrom}
       ${safeUrl(song.spotify) ? `<section class="listen">${spotifyEmbed(song.spotify) || `<a class="button" href="${esc(song.spotify)}" target="_blank" rel="noopener">Escuchar en Spotify</a>`}</section>` : ''}
       ${safeUrl(song.link) ? `<section class="listen"><a class="button ghost" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
+      ${rehearsals ? rehearsals.html(song) : ''}
 
       <section>
         <div class="tabs" role="tablist" style="grid-template-columns: repeat(${views.length}, 1fr)">
@@ -635,6 +637,7 @@ function renderSong(id, ctx = null, came = null) {
 
   const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index }, came);
   hydrateSpotify();
+  rehearsals?.wire(song);
   const moveKey = (d) => {
     if (ctx) {
       ctx.set.items[ctx.index].key = keyName(transposeKey(key, d));
@@ -1097,6 +1100,7 @@ function renderBridgePage(fromText = '', toText = '') {
 // ---------- navegación ----------
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
+const rehearsals = canEdit() ? setupRehearsals({ app, store, esc }) : null;
 const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
 // Setlists del equipo: viven en la hoja privada. Verlos y editarlos no pide PIN; borrarlos sí.

@@ -41,6 +41,10 @@ solo aparece dentro de la sección con PIN. Para escucharlos, la app pide el arc
 `getAudio`, con PIN y solo para audios registrados en *Audios*) en lugar de usar el link directo de Drive,
 que en el teléfono falla seguido.
 
+Las **grabaciones de ensayo** de cada canción van en la pestaña *Ensayos* (se crea sola) y en la carpeta
+**"Zamar · Grabaciones de ensayos"**. `listRehearsals` y `getRehearsalAudio` no piden PIN para que todo el
+equipo las escuche; `uploadRehearsal` y `deleteRehearsal` sí.
+
 Después de pegar el código nuevo, en el editor elige la función **prepararComposiciones** en la lista de
 arriba y toca **▶ Ejecutar**. Google pide permisos otra vez (ahora también para crear la hoja); acéptalos.
 Luego vuelve a implementar como se explica abajo.

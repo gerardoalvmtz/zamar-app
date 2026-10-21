@@ -1,12 +1,12 @@
 // Composiciones del ministerio: letra, acordes y audios de referencia de cada etapa.
 // No están en la hoja pública; se leen y guardan a través del Apps Script con el PIN.
 import { setupApi, readBase64 } from './api.js';
+import { MAX_AUDIO, audioBlobUrl, recordingName, setupRecorder } from './audio.js';
 import { keyName, parseKey, transposeKey, semitonesBetween, useFlats } from './music.js';
 import { MOODS, suggest, toChordPro, playProgression, stopPlaying } from './progressions.js';
 import { renderChordSheet, renderLyrics, lyricsFromChords, sheetKey, metadata } from './chordpro.js';
 
 export const STAGES = ['Idea', 'En proceso', 'Terminada', 'En repertorio'];
-const MAX_AUDIO = 25 * 1024 * 1024;
 const ALL_KEYS = [false, true].flatMap((minor) => Array.from({ length: 12 }, (_, pc) => ({ pc, minor })));
 
 /** ctx: { app, store, esc, backHeader, homeHeader, loadSongs } desde app.js */
@@ -411,17 +411,13 @@ export function setupCompositions(ctx) {
     if (audioUrls[fileId]) return audioUrls[fileId];
     let url;
     try {
-      const res = await api('getAudio', { fileId });
-      const bytes = Uint8Array.from(atob(res.data), (ch) => ch.charCodeAt(0));
-      url = URL.createObjectURL(new Blob([bytes], { type: playableType(res.mimeType) }));
+      url = audioBlobUrl(await api('getAudio', { fileId }));
     } catch (err) {
       if (!/acción|action|desconocid|unknown/i.test(err.message)) throw err;
       url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
     }
     return (audioUrls[fileId] = url);
   }
-  // Safari no reconoce "audio/x-m4a", que es como Drive etiqueta las grabaciones del iPhone.
-  const playableType = (t) => (/m4a|mp4|aac/i.test(t || '') ? 'audio/mp4' : t || 'audio/mpeg');
 
   // ---------- grabar o subir audio ----------
   function setupAudio(c) {
@@ -469,48 +465,7 @@ export function setupCompositions(ctx) {
       if (file) upload(file, file.name);
     });
 
-    const btn = app.querySelector('#recbtn');
-    if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
-      btn.disabled = true;
-      btn.title = 'Este navegador no puede grabar; usa Elegir archivo';
-      return;
-    }
-    let rec = null;
-    let timer = null;
-    btn.addEventListener('click', async () => {
-      if (rec) return rec.stop();
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        return msg('No hay permiso para usar el micrófono.');
-      }
-      // iPhone graba en mp4; Android y computadoras en webm.
-      const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported?.(t)) || '';
-      rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
-      const chunks = [];
-      const started = Date.now();
-      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      rec.onstop = () => {
-        clearInterval(timer);
-        stream.getTracks().forEach((t) => t.stop());
-        const mime = rec.mimeType || type || 'audio/webm';
-        rec = null;
-        btn.textContent = '● Grabar';
-        btn.classList.remove('danger');
-        const blob = new Blob(chunks, { type: mime.split(';')[0] });
-        const ext = mime.includes('mp4') ? 'm4a' : 'webm';
-        const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', 'h');
-        upload(blob, `${c.title} · ${label() || 'grabación'} · ${stamp}.${ext}`);
-      };
-      rec.start();
-      btn.textContent = '■ Detener';
-      btn.classList.add('danger');
-      timer = setInterval(() => {
-        const s = Math.round((Date.now() - started) / 1000);
-        msg(`Grabando ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
-      }, 500);
-    });
+    setupRecorder(app.querySelector('#recbtn'), msg, (blob, ext) => upload(blob, recordingName(c.title, label(), ext)));
   }
 
   // ---------- crear y editar ----------

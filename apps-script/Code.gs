@@ -34,12 +34,16 @@ const SETLIST_HEADERS = ['ID', 'Nombre', 'Fecha', 'Canciones', 'Creado', 'Actual
 const MAX_SETLIST_SONGS = 60;
 const SETLIST_PDF_FOLDER = 'Zamar · Setlists para compartir';
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
+// Grabaciones de ensayo de las canciones del repertorio. Canción = id de la canción en la app.
+const REHEARSAL_HEADERS = ['ID', 'Canción', 'Título', 'Etiqueta', 'Archivo', 'Link', 'Fecha', 'Quién'];
+const REHEARSAL_FOLDER = 'Zamar · Grabaciones de ensayos';
 const PRIVATE_TABS = {
   Composiciones: COMP_HEADERS, Audios: AUDIO_HEADERS, Comentarios: COMMENT_HEADERS,
-  Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS, Setlists: SETLIST_HEADERS,
+  Eventos: EVENT_HEADERS, Asistencia: RSVP_HEADERS, Setlists: SETLIST_HEADERS, Ensayos: REHEARSAL_HEADERS,
 };
-// Acciones que no piden PIN: ver, crear y editar setlists (borrarlos sí lo pide).
-const OPEN_ACTIONS = ['listSetlists', 'saveSetlist', 'uploadSetlistPdf'];
+// Acciones que no piden PIN: ver, crear y editar setlists (borrarlos sí lo pide), y ver y
+// escuchar las grabaciones de ensayo (subirlas y borrarlas sí lo pide).
+const OPEN_ACTIONS = ['listSetlists', 'saveSetlist', 'uploadSetlistPdf', 'listRehearsals', 'getRehearsalAudio'];
 
 // Columnas que la app puede cambiar. Las demás (por ejemplo la de Songbook) no se tocan.
 const MAIN_EDITABLE = [
@@ -320,6 +324,60 @@ const ACTIONS = {
     compSheet('Audios').appendRow(AUDIO_HEADERS.map((h) => audio[h]));
     log('Audio de composición', p.id, name, p.who);
     return { ok: true, audio: audio };
+  },
+
+  // ---------- grabaciones de ensayo ----------
+  listRehearsals() {
+    return { ok: true, items: records(compSheet('Ensayos')) };
+  },
+
+  uploadRehearsal(p) {
+    const song = String(p.song || '').slice(0, 200);
+    if (!/^[a-z0-9-]+$/.test(song)) throw new Error('Falta la canción.');
+    const bytes = Utilities.base64Decode(p.data || '');
+    if (!bytes.length) throw new Error('El audio está vacío.');
+    if (bytes.length > MAX_AUDIO_BYTES) throw new Error('El audio pesa más de 25 MB.');
+    const name = String(p.name || 'ensayo').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+    const file = filesFolder(REHEARSAL_FOLDER).createFile(Utilities.newBlob(bytes, p.mimeType || 'audio/mpeg', name));
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const rec = {
+      ID: 'g' + Utilities.getUuid().slice(0, 8),
+      'Canción': song,
+      'Título': String(p.title || '').slice(0, 200),
+      Etiqueta: String(p.label || '').slice(0, 200),
+      Archivo: name,
+      Link: file.getUrl(),
+      Fecha: new Date().toISOString(),
+      'Quién': String(p.who || '').slice(0, 80),
+    };
+    // Lo que escribe la gente se guarda como texto, nunca como fórmula.
+    compSheet('Ensayos').appendRow(REHEARSAL_HEADERS.map((h) => (/^[=+\-@]/.test(rec[h]) ? "'" + rec[h] : rec[h])));
+    log('Grabación de ensayo', rec['Título'] || song, name, p.who);
+    return { ok: true, item: rec };
+  },
+
+  getRehearsalAudio(p) {
+    const rec = records(compSheet('Ensayos')).filter((r) => String(r.ID) === String(p.id))[0];
+    const fileId = rec && (String(rec.Link).match(/\/d\/([A-Za-z0-9_-]+)/) || [])[1];
+    if (!fileId) throw new Error('No encontré esa grabación.');
+    const blob = DriveApp.getFileById(fileId).getBlob();
+    return { ok: true, mimeType: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+  },
+
+  deleteRehearsal(p) {
+    const sheet = compSheet('Ensayos');
+    const row = findById(sheet, p.id);
+    if (!row) return { ok: true };
+    const rec = records(sheet)[row - 2];
+    const fileId = (String(rec.Link).match(/\/d\/([A-Za-z0-9_-]+)/) || [])[1];
+    if (fileId) {
+      try {
+        DriveApp.getFileById(fileId).setTrashed(true);
+      } catch (ignored) {}
+    }
+    sheet.deleteRow(row);
+    log('Borrar grabación de ensayo', rec['Título'] || rec['Canción'], rec.Archivo, p.who);
+    return { ok: true };
   },
 
   // Borra la composición con sus comentarios. Los audios se mandan a la papelera de Drive,

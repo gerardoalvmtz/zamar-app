@@ -92,6 +92,14 @@ progresiones con la sección donde suelen ir, por qué suenan así y el tempo su
 en el editor, **agregar a los acordes** como ChordPro. Las progresiones están en grados en `js/progressions.js`;
 para agregar o cambiar alguna basta con editar `MOODS`. No usa el Apps Script.
 
+### Grabaciones de ensayo
+
+En la ficha de cada canción, **Grabaciones del equipo** guarda audios de cómo la tocamos nosotros (un
+ensayo, una versión acústica). Se graban desde el teléfono o se suben como archivo (hasta 25 MB) y quedan en
+la pestaña *Ensayos* de la hoja privada, con los audios en la carpeta de Drive **"Zamar · Grabaciones de
+ensayos"**. Escucharlas no pide PIN; subirlas y borrarlas sí. Una grabación borrada queda 30 días en la
+papelera de Drive.
+
 ### Agenda
 
 También con PIN. Cada evento lleva tipo, estatus (Invitación recibida, Pendiente de detalles, Confirmado,

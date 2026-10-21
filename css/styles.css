@@ -560,8 +560,8 @@ button.primary { background: var(--accent); color: var(--on-accent); border-colo
 }
 .recorder input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .recorder .hint:empty { display: none; }
-.recorder #recbtn { font-weight: 600; }
-.recorder #recbtn.danger { border-color: var(--bad); }
+.recorder #recbtn, .recorder #rrec { font-weight: 600; }
+.recorder #recbtn.danger, .recorder #rrec.danger { border-color: var(--bad); }
 @media (max-width: 420px) { .nav a { font-size: 0.88rem; } }
 .keyctl.two { grid-template-columns: 1fr 1fr; }
 .field textarea.prose { font: 15px/1.5 var(--sans); }
@@ -778,3 +778,10 @@ details.ideas[open] summary { margin-bottom: 12px; }
 details.connect { margin-top: 20px; }
 details.connect > summary { cursor: pointer; font: 600 0.78rem/1 var(--sans); letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); padding: 8px 0; }
 details.connect[open] > summary { margin-bottom: 8px; }
+
+/* Grabaciones de ensayo en la ficha de la canción */
+.rehearsals .audio .row { gap: 10px; align-items: center; flex-wrap: wrap; }
+.rehearsals .link.danger { color: var(--bad); font-size: 0.85rem; }
+details.recadd { margin-top: 10px; }
+details.recadd > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+details.recadd .recorder { margin-top: 8px; }

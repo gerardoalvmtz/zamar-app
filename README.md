@@ -117,7 +117,7 @@ El próximo evento también aparece en la página de inicio (con la última copi
 
 **Ensayos.** Un evento de tipo *Ensayo* trae tres pestañas:
 - *Antes · Programa:* canciones del repertorio o de un setlist y puntos para platicar, cada uno con sus minutos.
-  Muestra la hora de cada punto, avisa si se pasa del horario y se comparte por WhatsApp. Las tareas sin
+  Muestra la hora de cada punto, avisa si se pasa del horario y se comparte por WhatsApp como texto o como imagen PNG. Las tareas sin
   terminar de ensayos anteriores aparecen ahí.
 - *Durante · Modo ensayo:* un punto a la vez, con cronómetro (vive en el teléfono de quien lo lleva), notas y
   acceso directo a la canción.

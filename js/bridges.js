@@ -1,9 +1,30 @@
 // Puentes entre tonalidades: qué acordes tocar al final de una canción para llegar a la
-// siguiente sin que el cambio suene brusco. Usa teoría básica: acordes en común (pivote),
-// ii–V y la dominante con sus, que es lo más usado en worship.
+// siguiente sin que el cambio suene brusco.
+//
+// La idea central viene de "Armonía Ilustrada" (Brian Callipari): lo que pega dos acordes son
+// las notas que comparten (el "glue mágico") y qué tan poco se mueven las demás. Por eso cada
+// camino se mide nota por nota y se recomienda el que menos salta. Además de los recursos de
+// siempre (acorde pivote, ii–V, dominante con sus) se prueban los de los libros: cadenas de
+// acordes que comparten dos notas (transformaciones P, R y L), el IV que se vuelve menor, el
+// disminuido de paso, el aumentado como portal y el sustituto tritonal.
 import { pcName, useFlats, keyName, keyRelation } from './music.js';
 
 const mod = (n) => ((n % 12) + 12) % 12;
+
+// Intervalos de cada tipo de acorde y cómo se escribe.
+const QUAL = {
+  '': [0, 4, 7],
+  m: [0, 3, 7],
+  7: [0, 4, 7, 10],
+  m7: [0, 3, 7, 10],
+  m7b5: [0, 3, 6, 10],
+  dim7: [0, 3, 6, 9],
+  aug: [0, 4, 8],
+  sus4: [0, 5, 7],
+};
+const SYMBOL = { dim7: '°7', aug: '+' };
+
+export const pcsOf = (c) => QUAL[c.q].map((i) => mod(c.pc + i));
 
 /** Acordes de la tonalidad con su grado. En menor se incluye la V mayor (armónica). */
 function diatonic(key) {
@@ -28,106 +49,342 @@ function diatonic(key) {
       ].map((c) => ({ ...c, pc: mod(c.pc) }));
 }
 
-const triad = (pc, q) => [pc, pc + (q.startsWith('m') ? 3 : 4), pc + 7].map(mod);
-
 // Acordes de paso preferidos para entrar a la tonalidad nueva (los que "preparan" la V).
 const PREP = { ii: 4, IV: 4, iv: 4, vi: 3, VI: 3, iii: 2, III: 2, VII: 1, v: 1, I: 0, i: 0, V: 0 };
 
+// Distancia más corta entre dos notas (0 a 6 semitonos).
+const dist = (a, b) => Math.min(mod(a - b), mod(b - a));
+
 /**
- * Caminos de acordes para pasar de una tonalidad a otra.
- * Devuelve { relation, closeness, tip, options: [{ name, why, steps: [{ chord, role }] }] }.
+ * Qué tanto se mueven las voces para pasar de un acorde a otro: cada nota busca la más
+ * cercana del otro acorde. Las notas en común cuestan 0; un semitono, 1. Así C → Em cuesta
+ * poco (dos notas se quedan) y C → F#7 cuesta mucho.
  */
+export function motion(a, b) {
+  const A = pcsOf(a);
+  const B = pcsOf(b);
+  const near = (from, to) => from.reduce((s, n) => s + Math.min(...to.map((m) => dist(n, m))), 0);
+  return near(A, B) + near(B, A);
+}
+
+const shared = (a, b) => pcsOf(a).filter((n) => pcsOf(b).includes(n));
+
+// Transformaciones de la teoría neoriemanniana: cada una deja dos notas en su lugar.
+const PRL = (c) =>
+  c.q === ''
+    ? [
+        { pc: c.pc, q: 'm', op: 'P' },
+        { pc: mod(c.pc + 9), q: 'm', op: 'R' },
+        { pc: mod(c.pc + 4), q: 'm', op: 'L' },
+      ]
+    : [
+        { pc: c.pc, q: '', op: 'P' },
+        { pc: mod(c.pc + 3), q: '', op: 'R' },
+        { pc: mod(c.pc + 8), q: '', op: 'L' },
+      ];
+
+const same = (a, b) => a.pc === b.pc && a.q === b.q;
+
+/** Camino más corto de transformaciones P, R y L desde `start` hasta algún acorde de `goals`. */
+function prlPath(start, goals, maxDepth = 3) {
+  let frontier = [[start]];
+  const seen = new Set([`${start.pc}${start.q}`]);
+  for (let depth = 0; depth < maxDepth; depth++) {
+    const next = [];
+    const hits = [];
+    for (const path of frontier) {
+      for (const n of PRL(path[path.length - 1])) {
+        const id = `${n.pc}${n.q}`;
+        if (seen.has(id)) continue;
+        const p = [...path, n];
+        if (goals.some((g) => same(g, n))) hits.push(p);
+        else next.push(p);
+      }
+    }
+    if (hits.length) {
+      // Entre los más cortos, el que llega al acorde que mejor prepara la V.
+      const score = (p) => PREP[goals.find((g) => same(g, p[p.length - 1])).deg] ?? 0;
+      return hits.sort((a, b) => score(b) - score(a))[0];
+    }
+    next.forEach((p) => seen.add(`${p[p.length - 1].pc}${p[p.length - 1].q}`));
+    frontier = next;
+  }
+  return null;
+}
+
+// ---------- voces para el teclado ----------
+const NOTE_LO = 55; // G3
+const NOTE_HI = 77; // F5
+const BASS_LO = 36; // C2
+const BASS_HI = 50; // D3
+
+/** Todas las formas cerradas (inversiones) de un acorde dentro del rango de la mano derecha. */
+function closeVoicings(pcs) {
+  const out = [];
+  for (let low = NOTE_LO; low <= NOTE_HI - 7; low++) {
+    if (!pcs.includes(mod(low))) continue;
+    const notes = [low];
+    let ok = true;
+    for (let i = 1; i < pcs.length; i++) {
+      let n = notes[notes.length - 1] + 1;
+      while (!pcs.includes(mod(n)) || notes.some((x) => mod(x) === mod(n))) n++;
+      if (n > NOTE_HI) ok = false;
+      notes.push(n);
+    }
+    if (ok) out.push(notes);
+  }
+  return out;
+}
+
+const moveCost = (prev, next) =>
+  next.reduce((s, n) => s + Math.min(...prev.map((p) => Math.abs(n - p))), 0) +
+  prev.reduce((s, p) => s + Math.min(...next.map((n) => Math.abs(n - p))), 0);
+
+/**
+ * Elige la inversión de cada acorde que menos mueve las manos (conducción de voces) y una
+ * línea de bajo que camine por pasos cuando se puede. Devuelve, por acorde,
+ * { notes: [midi mano derecha], bass: midi, slash: pc | null }.
+ */
+export function voiceLead(chords) {
+  const out = [];
+  chords.forEach((c, i) => {
+    const pcs = pcsOf(c);
+    const options = closeVoicings(pcs);
+    let notes;
+    if (!i) {
+      // Primer acorde: cerca del centro del teclado, como se toca al final de una canción.
+      notes = options.sort((a, b) => Math.abs(a[1] - 66) - Math.abs(b[1] - 66))[0];
+    } else {
+      const prev = out[i - 1].notes;
+      const center = (v) => Math.abs(v.reduce((s, n) => s + n, 0) / v.length - 66) * 0.15;
+      notes = options.sort((a, b) => moveCost(prev, a) + center(a) - (moveCost(prev, b) + center(b)))[0];
+    }
+    // Bajo: la raíz en la octava más cercana al bajo anterior.
+    const near = (pc, from) => {
+      let best = null;
+      for (let n = BASS_LO; n <= BASS_HI; n++) if (mod(n) === pc && (best === null || Math.abs(n - from) < Math.abs(best - from))) best = n;
+      return best;
+    };
+    const prevBass = i ? out[i - 1].bass : 43;
+    let bass = near(c.pc, prevBass);
+    let slash = null;
+    // En los acordes mayores de paso (ni el primero, ni el último, ni la dominante) se pone la
+    // tercera en el bajo si así el bajo camina por pasos en vez de saltar (G → D/F# → Em).
+    const passing = i > 0 && i < chords.length - 1 && c.q === '';
+    if (passing && Math.abs(bass - prevBass) > 2) {
+      const third = mod(c.pc + 4);
+      const alt = near(third, prevBass);
+      if (Math.abs(alt - prevBass) <= 2) {
+        bass = alt;
+        slash = third;
+      }
+    }
+    out.push({ notes, bass, slash });
+  });
+  return out;
+}
+
+// ---------- caminos ----------
 export function bridges(from, to) {
   if (!from || !to) return null;
   const fFlats = useFlats(from);
   const tFlats = useFlats(to);
-  const name = (c, flats) => pcName(c.pc, flats) + c.q;
   const tName = keyName(to);
-  const start = { chord: name({ pc: from.pc, q: from.minor ? 'm' : '' }, fFlats), role: `${from.minor ? 'i' : 'I'} de ${keyName(from)}`, from: true };
-  const end = { chord: name({ pc: to.pc, q: to.minor ? 'm' : '' }, tFlats), role: `${to.minor ? 'i' : 'I'} de ${tName}`, to: true };
-  const V7 = { chord: name({ pc: mod(to.pc + 7), q: '7' }, tFlats), role: `V7 de ${tName}` };
-  const Vsus = { chord: name({ pc: mod(to.pc + 7), q: 'sus4' }, tFlats), role: `V de ${tName}, suspendido` };
+  const fName = keyName(from);
+  const tonic = (k) => ({ pc: k.pc, q: k.minor ? 'm' : '' });
+  const S = { ...tonic(from), role: `${from.minor ? 'i' : 'I'} de ${fName}`, from: true };
+  const E = { ...tonic(to), role: `${to.minor ? 'i' : 'I'} de ${tName}`, to: true };
+  const V7 = { pc: mod(to.pc + 7), q: '7', role: `V7 de ${tName}` };
+  const Vsus = { pc: mod(to.pc + 7), q: 'sus4', role: `V de ${tName}, suspendido` };
+  const name = (c) => pcName(c.pc, c.from || c.fromName ? fFlats : tFlats) + (SYMBOL[c.q] ?? c.q);
 
   const fromChords = diatonic(from);
   const toChords = diatonic(to);
-  const common = toChords.filter((c) => fromChords.some((f) => f.pc === c.pc && f.q === c.q));
+  const common = toChords.filter((c) => fromChords.some((f) => same(f, c)));
   const relation = keyRelation(from, to).label;
-  const closeness = from.pc === to.pc && from.minor === to.minor ? 'same' : common.length >= 4 ? 'near' : common.length >= 2 ? 'mid' : 'far';
+  const closeness = same(S, E) ? 'same' : common.length >= 4 ? 'near' : common.length >= 2 ? 'mid' : 'far';
 
-  // Nota que suena en los dos acordes: voces o teclado la sostienen mientras cambia el bajo.
-  const fromTriad = triad(from.pc, from.minor ? 'm' : '');
-  let shared = fromTriad.filter((n) => triad(to.pc, to.minor ? 'm' : '').includes(n));
-  let sharedWith = end.chord;
-  if (!shared.length) {
-    shared = fromTriad.filter((n) => triad(mod(to.pc + 7), '').includes(n));
-    sharedWith = V7.chord;
-  }
-  const tip = shared.length
-    ? `Nota puente: ${pcName(shared[0], tFlats)}. Está en ${start.chord} y en ${sharedWith}; el teclado o las voces la pueden sostener mientras cambia el bajo.`
-    : `No hay nota en común: deja que el bajo o un pad marque ${V7.chord} un compás completo antes de entrar.`;
+  // Nombre de cada nota según el acorde al que pertenece: la tercera menor de C es Eb, no D#.
+  const spell = (c, n) => {
+    const root = name(c);
+    if (root[1] === '#') return pcName(n, false);
+    if (root[1] === 'b') return pcName(n, true);
+    const i = mod(n - c.pc);
+    return pcName(n, [3, 6, 9, 10].includes(i) || (i === 5 && root[0] === 'F'));
+  };
+
+  const finish = (o) => {
+    const voices = voiceLead(o.steps);
+    const steps = o.steps.map((c, i) => {
+      const v = voices[i];
+      const prev = o.steps[i - 1];
+      const glue = prev ? shared(prev, c).map((n) => spell(c, n)) : [];
+      return {
+        chord: name(c) + (v.slash !== null ? `/${spell(c, v.slash)}` : ''),
+        role: c.role,
+        ...(c.from ? { from: true } : {}),
+        ...(c.to ? { to: true } : {}),
+        glue,
+        notes: v.notes,
+        bass: v.bass,
+        keys: v.notes.map((n) => spell(c, n)).join('-'),
+      };
+    });
+    const moves = o.steps.slice(1).reduce((s, c, i) => s + motion(o.steps[i], c), 0);
+    const dominant = o.steps.some((c) => c.q === '7' && c.pc === V7.pc);
+    return { name: o.name, why: o.why, steps, moves, dominant, cost: moves + (o.penalty || 0) + o.steps.length };
+  };
 
   if (closeness === 'same') {
     return {
       relation,
       closeness,
       tip: 'Misma tonalidad: puedes entrar directo o sostener el acorde mientras se presenta la siguiente.',
-      options: [{ name: 'Directo', why: 'Las dos canciones están en el mismo tono.', steps: [start, end] }],
+      options: [finish({ name: 'Directo', why: 'Las dos canciones están en el mismo tono.', steps: [S, E] })],
     };
   }
 
-  const options = [];
+  const routes = [];
+  const add = (o) => {
+    const key = o.steps.map((c) => `${c.pc}${c.q}`).join(' ');
+    if (!routes.some((r) => r.key === key)) routes.push({ ...o, key });
+  };
+  const degIn = (c, chords) => chords.find((x) => same(x, c))?.deg;
+  const roleOf = (c) => {
+    const t = degIn(c, toChords);
+    const f = degIn(c, fromChords);
+    return t ? `${t} de ${tName}` : f ? `${f} de ${fName}` : 'de paso';
+  };
+
+  // 1. Acorde en común: existe en los dos tonos, así que el oído no siente el cambio hasta la V7.
   const pivots = common
-    .filter((c) => !(c.pc === from.pc) && !(c.pc === to.pc && c.deg.toLowerCase() === 'i'))
+    .filter((c) => c.pc !== from.pc && !same(c, E) && c.deg !== 'V')
     .sort((a, b) => (PREP[b.deg] ?? 0) - (PREP[a.deg] ?? 0));
-  const pivot = pivots[0];
-  if (pivot && pivot.deg !== 'V') {
-    const inFrom = fromChords.find((f) => f.pc === pivot.pc && f.q === pivot.q).deg;
-    options.push({
+  if (pivots[0]) {
+    const p = pivots[0];
+    const inFrom = degIn(p, fromChords);
+    add({
       name: 'Acorde en común',
-      why: `${name(pivot, tFlats)} existe en los dos tonos (${inFrom} de ${keyName(from)} y ${pivot.deg} de ${tName}), así que el oído no siente el cambio hasta la V7.`,
-      steps: [start, { chord: name(pivot, tFlats), role: `${inFrom} → ${pivot.deg}` }, V7, end],
+      why: `${name(p)} existe en los dos tonos (${inFrom} de ${fName} y ${p.deg} de ${tName}), así que el oído no siente el cambio hasta la V7.`,
+      steps: [S, { ...p, role: `${inFrom} → ${p.deg}` }, V7, E],
     });
   }
 
-  // Cambiar la tónica de mayor a menor (o al revés) suele abrir la puerta al tono nuevo:
-  // G → Gm ya es el vi de Bb.
+  // 2. Tónica a menor (o a mayor): G → Gm ya es el vi de Bb.
   const flip = { pc: from.pc, q: from.minor ? '' : 'm' };
-  const flipIn = toChords.find((c) => c.pc === flip.pc && c.q === flip.q && !(c.pc === to.pc && c.q === (to.minor ? 'm' : '')));
-  if (flipIn && flipIn.deg !== 'V' && !(pivot && pivot.pc === flip.pc && pivot.q === flip.q)) {
-    options.push({
+  const flipDeg = degIn(flip, toChords);
+  if (flipDeg && !same(flip, E) && flipDeg !== 'V') {
+    add({
       name: from.minor ? 'Tónica a mayor' : 'Tónica a menor',
-      why: `Cambia ${start.chord} por ${name(flip, tFlats)}: es casi el mismo acorde, pero ya pertenece a ${tName} (es su ${flipIn.deg}).`,
-      steps: [start, { chord: name(flip, tFlats), role: `${flipIn.deg} de ${tName}` }, V7, end],
+      why: `Cambia ${name(S)} por ${name(flip)}: solo se mueve una nota y ya pertenece a ${tName} (es su ${flipDeg}).`,
+      steps: [S, { ...flip, role: `${flipDeg} de ${tName}` }, V7, E],
     });
   }
 
-  // Si el acorde en común ya es el ii del tono nuevo, el ii–V sería el mismo camino.
-  const ii = to.minor ? { pc: mod(to.pc + 2), q: 'm7b5' } : { pc: mod(to.pc + 2), q: 'm7' };
-  if (!options.some((o) => o.name === 'Acorde en común' && pivot.deg === 'ii')) options.push({
+  // 3. Notas en común: acordes que comparten dos notas con el anterior (P, R y L) hasta
+  //    llegar a uno que prepare la V del tono nuevo.
+  const goals = toChords.filter((c) => (PREP[c.deg] ?? 0) >= 2);
+  const chain = prlPath(tonic(from), goals);
+  if (chain && chain.length >= 2) {
+    const mid = chain.slice(1).map((c) => ({ ...c, role: roleOf(c) }));
+    add({
+      name: 'Notas en común',
+      why: `Cada acorde comparte dos notas con el anterior, así que siempre hay algo que se sostiene mientras el resto se mueve un paso. Cuando llegas a ${name(mid[mid.length - 1])} ya estás en ${tName}.`,
+      steps: [S, ...mid, V7, E],
+      penalty: mid.length > 2 ? 2 : 0,
+    });
+  }
+
+  // 4. El IV que se vuelve menor (F → Fm → C): la cadencia más tierna para llegar a un tono mayor.
+  if (!to.minor) {
+    const IV = { pc: mod(to.pc + 5), q: '', role: `IV de ${tName}` };
+    const iv = { pc: mod(to.pc + 5), q: 'm', role: `iv de ${tName} (prestado)` };
+    const steps = same(IV, S) ? [S, iv, E] : [S, IV, iv, E];
+    if (steps.length === 3 || shared(S, IV).length) {
+      add({
+        penalty: steps.length === 3 ? 0 : 2,
+        name: 'Cuarto menor',
+        why: `${name(IV)} → ${name(iv)} → ${name(E)}: el IV se vuelve menor y cae al tono nuevo sin pasar por la dominante. Es suave y muy emotivo, de balada de adoración.`,
+        steps,
+      });
+    }
+  }
+
+  // 5. Disminuido de paso: la sensible del tono nuevo como °7. Sus notas están a medio tono del
+  //    acorde de llegada. Si los tonos están a terceras menores, el mismo °7 sirve para los dos.
+  const dim = { pc: mod(to.pc - 1), q: 'dim7', role: `vii°7 de ${tName}` };
+  const symmetric = mod(to.pc - from.pc) % 3 === 0;
+  add({
+    name: 'Disminuido de paso',
+    why: symmetric
+      ? `${name(dim)} es simétrico: tiene las mismas notas que el disminuido de ${fName}, así que funciona de puerta entre los dos tonos. Todas sus notas caen a medio tono de ${name(E)}.`
+      : `${name(dim)} es la sensible de ${tName}: casi todas sus notas están a medio tono de ${name(E)}, así que resuelve solo. Funciona bien con pad o piano sostenido.`,
+    steps: [S, dim, E],
+    penalty: 3,
+  });
+
+  // 6. Aumentado como portal: si los tonos están a tercera mayor, C+ = E+ = G#+.
+  const up = mod(to.pc - from.pc);
+  if (!from.minor && !to.minor && (up === 4 || up === 8)) {
+    const aug = { pc: from.pc, q: 'aug', fromName: true, role: `${name(S)} aumentado` };
+    add({
+      name: 'Aumentado',
+      why: `${name(aug)} tiene las mismas notas que el aumentado de ${tName}: sube una sola nota medio tono y ya estás en el tono nuevo. Suena a película; déjalo sonar un compás.`,
+      steps: [S, aug, E],
+      penalty: 5,
+    });
+  }
+
+  // 7. ii – V: funciona aunque los tonos estén lejos.
+  const ii = { pc: mod(to.pc + 2), q: to.minor ? 'm7b5' : 'm7', role: `${to.minor ? 'iiø' : 'ii'} de ${tName}` };
+  add({
     name: 'ii – V',
     why: `Prepara el tono nuevo con su ii y su dominante; funciona aunque los tonos estén lejos.`,
-    steps: [start, { chord: name(ii, tFlats), role: `${to.minor ? 'iiø' : 'ii'} de ${tName}` }, V7, end],
+    steps: [S, ii, V7, E],
   });
 
-  options.push({
+  // 8. Dominante con sus: el clásico de worship, el más corto.
+  add({
     name: 'Dominante con sus',
-    why: `El clásico de worship: deja sonar ${Vsus.chord} (puede ser con pad) y resuelve a ${V7.chord}. Es el más corto.`,
-    steps: [start, Vsus, V7, end],
+    why: `El clásico de worship: deja sonar ${name(Vsus)} (puede ser con pad) y resuelve a ${name(V7)}.`,
+    steps: [S, Vsus, V7, E],
   });
 
-  // Subir medio tono o un tono: el "levantón" que se usa en el último coro.
-  const up = mod(to.pc - from.pc);
+  // 9. Sustituto tritonal: en vez de la V7, la dominante que está a medio tono arriba del destino.
+  const sub = { pc: mod(to.pc + 1), q: '7', role: `sustituto de ${name(V7)}` };
+  add({
+    name: 'Sustituto tritonal',
+    why: `${name(sub)} comparte con ${name(V7)} las dos notas que piden resolver, pero baja medio tono a ${name(E)}. Suena más moderno; úsalo con cuidado.`,
+    steps: [S, sub, E],
+    penalty: 5,
+  });
+
+  // 10. Subida de medio tono o un tono: el "levantón" del último coro.
   if (from.minor === to.minor && (up === 1 || up === 2)) {
-    options.push({
+    add({
       name: 'Subida',
-      why: `Sube ${up === 1 ? 'medio tono' : 'un tono'}: corta en seco al final de la frase y entra con ${V7.chord} en el último tiempo.`,
-      steps: [start, { ...V7, role: `${V7.role}, un tiempo` }, end],
+      why: `Sube ${up === 1 ? 'medio tono' : 'un tono'}: corta en seco al final de la frase y entra con ${name(V7)} en el último tiempo.`,
+      steps: [S, { ...V7, role: `${V7.role}, un tiempo` }, E],
+      penalty: 6,
     });
   }
 
-  // Ordena de lo más suave a lo más directo según qué tan lejos están los tonos.
-  const rank = (o) => (o.name === 'Acorde en común' ? 0 : o.name.startsWith('Tónica') ? 1 : o.name === 'ii – V' ? 2 : 3);
-  options.sort((a, c) => rank(a) - rank(c));
+  // Del camino que menos mueve las voces al que más.
+  // A igual costo gana el que pasa por la V7, que confirma mejor el tono nuevo.
+  const options = routes.map(finish).sort((a, b) => a.cost - b.cost || b.dominant - a.dominant);
+
+  // Nota puente: la que más tiempo se puede sostener en el camino recomendado.
+  const best = options[0].steps;
+  let tip = '';
+  for (const pcN of pcsOf(S)) {
+    let n = 1;
+    while (n < best.length && best[n].notes.some((x) => mod(x) === pcN)) n++;
+    if (n > 1 && (!tip || n > tip.n)) tip = { n, pc: pcN };
+  }
+  tip = tip
+    ? `Nota puente: ${pcName(tip.pc, tFlats)}. Se queda sonando en ${best.slice(0, tip.n).map((s) => s.chord).join(', ')}; las voces o el teclado la pueden sostener mientras cambia lo demás.`
+    : `No hay nota que se quede: que el teclado mueva cada voz solo un paso (abajo verás las notas) y el bajo marque ${name(V7)} un compás completo.`;
+
   return { relation, closeness, tip, options };
 }
 
@@ -148,19 +405,31 @@ export function tempoTip(a, b) {
     : `La siguiente va más lento (${a} → ${b} BPM): deja que el puente se alargue y baja la intensidad antes de entrar.`;
 }
 
+/** Qué tan suave es el camino, en palabras. */
+function smoothLabel(o) {
+  const per = o.moves / (o.steps.length - 1);
+  return per <= 4 ? 'Muy suave' : per <= 6 ? 'Suave' : 'Con más movimiento';
+}
+
 /** HTML del mapa: cada opción es una fila de acordes con su función debajo. */
-export function bridgeHtml(b, esc, { recommend = true } = {}) {
+export function bridgeHtml(b, esc, { recommend = true, bpm = 0 } = {}) {
   if (!b) return '';
   const opts = b.options;
   return `<div class="bridge">
     ${opts
       .map(
         (o, i) => `<div class="route">
-          <div class="route-head"><strong>${esc(o.name)}</strong>${recommend && i === 0 ? '<span class="pill ok">Recomendado</span>' : ''}</div>
+          <div class="route-head"><strong>${esc(o.name)}</strong>${recommend && i === 0 ? '<span class="pill ok">Recomendado</span>' : `<span class="pill">${smoothLabel(o)}</span>`}</div>
           <ol class="path">${o.steps
-            .map((s) => `<li class="${s.from ? 'from' : s.to ? 'to' : ''}"><b>${esc(s.chord)}</b><small>${esc(s.role)}</small></li>`)
+            .map(
+              (s, j) => `<li class="${s.from ? 'from' : s.to ? 'to' : ''}">${
+                j ? `<span class="glue">${s.glue.length ? `🔗 ${esc(s.glue.join(' · '))}` : '↕ por pasos'}</span>` : ''
+              }<b>${esc(s.chord)}</b><small>${esc(s.role)}</small></li>`,
+            )
             .join('')}</ol>
           <p class="hint">${esc(o.why)}</p>
+          <p class="hint keys">🎹 ${o.steps.map((s) => esc(s.keys)).join(' → ')}</p>
+          <div class="row"><button type="button" class="button ghost small" data-bpm="${bpm || ''}" data-bridgeplay="${esc(JSON.stringify(o.steps.map((s) => [...s.notes, s.bass])))}">▶ Escuchar</button></div>
         </div>`,
       )
       .join('')}

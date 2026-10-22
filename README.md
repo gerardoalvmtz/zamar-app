@@ -115,9 +115,11 @@ En cada evento cada quien marca **Voy / Tal vez / No puedo** con lo que toca, se
 compartir el resumen por WhatsApp, agregarlo al calendario del teléfono y abrir el lugar en Maps.
 El próximo evento también aparece en la página de inicio (con la última copia guardada).
 
-**Ensayos.** Un evento de tipo *Ensayo* trae tres pestañas:
+**Ensayos.** Un evento de tipo *Ensayo* no lleva estatus de invitación (solo se puede cancelar ese día) y, al
+crearlo, se puede repetir cada semana o cada 2 semanas hasta una fecha: se crea un evento por fecha y cada uno
+se ajusta por separado. Trae tres pestañas:
 - *Antes · Programa:* canciones del repertorio o de un setlist y puntos para platicar, cada uno con sus minutos.
-  Muestra la hora de cada punto, avisa si se pasa del horario y se comparte por WhatsApp como texto o como imagen PNG. Las tareas sin
+  Muestra la hora de cada punto (en formato de 12 horas), avisa si se pasa del horario y se comparte por WhatsApp como texto o como imagen PNG. Las tareas sin
   terminar de ensayos anteriores aparecen ahí.
 - *Durante · Modo ensayo:* un punto a la vez, con cronómetro (vive en el teléfono de quien lo lleva), notas y
   acceso directo a la canción.

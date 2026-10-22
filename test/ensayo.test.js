@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlan, planMinutes, availableMinutes, startTimes, pendingTasks, clock, programText, minutesText } from '../js/ensayo.js';
+import { parsePlan, planMinutes, availableMinutes, startTimes, pendingTasks, clock, programText, minutesText, time12 } from '../js/ensayo.js';
 
 const plan = parsePlan(
   JSON.stringify({
@@ -44,11 +44,19 @@ test('cronómetro', () => {
 
 test('textos para el chat', () => {
   const p = programText(e, plan, '📅 sábado');
-  assert.match(p, /17:10 🎵 Abba \(G\) · 15 min/);
+  assert.match(p, /5:10 pm 🎵 Abba \(G\) · 15 min/);
   assert.match(p, /Total: 45 min/);
   const m = minutesText(e, { ...plan, present: ['Gerardo', 'Ale'] }, '📅 sábado');
   assert.match(m, /Asistieron: Gerardo, Ale/);
   assert.match(m, /Vimos:\n• Abba — Final en ritardando/);
   assert.match(m, /Quedó pendiente:\n• Oración\n• Aleluya/);
   assert.match(m, /☐ Sacar la armonía del coro — Ale/);
+});
+
+test('horas en formato de 12 horas', () => {
+  assert.equal(time12('20:00'), '8 pm');
+  assert.equal(time12('17:30'), '5:30 pm');
+  assert.equal(time12('00:15'), '12:15 am');
+  assert.equal(time12('12:00'), '12 pm');
+  assert.equal(time12(''), '');
 });

@@ -152,7 +152,7 @@ export async function programImage(info) {
   const sans = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const titleX = pad + 150;
+  const titleX = pad + 175;
   const pillW = 120;
   const textW = W - pad - pillW - 40 - titleX;
 

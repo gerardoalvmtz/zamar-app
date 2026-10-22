@@ -66,6 +66,14 @@ export function pendingTasks(events, current) {
     .sort((a, b) => (a.event.day || '').localeCompare(b.event.day || ''));
 }
 
+/** "20:00" → "8 pm", "17:30" → "5:30 pm". */
+export function time12(t) {
+  if (!t) return '';
+  const h = Number(t.slice(0, 2));
+  const m = t.slice(3, 5);
+  return `${h % 12 || 12}${m === '00' ? '' : ':' + m} ${h < 12 ? 'am' : 'pm'}`;
+}
+
 /** mm:ss, con signo menos cuando ya se pasó del tiempo. */
 export function clock(secs) {
   const neg = secs < 0;
@@ -83,7 +91,7 @@ export function programText(e, plan, when) {
     when,
     '',
     'Programa:',
-    ...plan.items.map((i, n) => `${times[n] ? times[n] + ' ' : ''}${i.kind === 'song' ? '🎵' : '💬'} ${itemLine(i)}`),
+    ...plan.items.map((i, n) => `${times[n] ? time12(times[n]) + ' ' : ''}${i.kind === 'song' ? '🎵' : '💬'} ${itemLine(i)}`),
     `Total: ${planMinutes(plan)} min`,
   ].join('\n');
 }
@@ -185,7 +193,7 @@ export function setupEnsayo(deps) {
             ? `<ol class="planlist">${plan.items
                 .map(
                   (i, n) => `<li data-item="${esc(i.id)}" class="${i.kind}">
-                    <span class="ptime">${esc(times[n] || String(n + 1))}</span>
+                    <span class="ptime">${esc(time12(times[n]) || String(n + 1))}</span>
                     <span class="pmain">
                       ${
                         i.kind === 'song'
@@ -208,10 +216,9 @@ export function setupEnsayo(deps) {
       </section>
       <section class="planadd">
         <h2>Agregar</h2>
-        <div class="row">
-          <input id="addsong" list="songoptions" placeholder="Canción del repertorio" aria-label="Canción">
-          <datalist id="songoptions">${songs().map((s) => `<option value="${esc(s.title)}">`).join('')}</datalist>
-          <button type="button" data-action="addsong">+ Canción</button>
+        <div class="songpick">
+          <input id="addsong" type="search" placeholder="🎵 Busca una canción por título o autor" aria-label="Canción" autocomplete="off">
+          <ul class="addresults songhits" id="songhits" hidden></ul>
         </div>
         <div class="row">
           <input id="addtopic" placeholder="Punto a platicar: oración, avisos, repertorio de la boda…" aria-label="Punto">
@@ -354,7 +361,7 @@ export function setupEnsayo(deps) {
         const t = deps.today();
         tab = !e.day || e.day > t ? 'programa' : e.day === t ? 'durante' : 'minuta';
       }
-      const when = `📅 ${dateRange(e)}${e.time ? `, ${e.time}${e.end ? `–${e.end}` : ''}` : ''}${e.place ? ` · ${e.place}` : ''}`;
+      const when = `📅 ${dateRange(e)}${e.time ? `, ${time12(e.time)}${e.end ? ` a ${time12(e.end)}` : ''}` : ''}${e.place ? ` · ${e.place}` : ''}`;
       document.title = `${TABS.find((t) => t.id === tab).title} · ${e.title}`;
       app.innerHTML = `
         ${backHeader(`#/agenda/${encodeURIComponent(e.id)}`, e.title)}
@@ -412,12 +419,42 @@ export function setupEnsayo(deps) {
         changed();
       });
       const addSong = (s, key) => plan.items.push({ id: uid(), kind: 'song', songId: s.id, title: s.title, key: key || songKey(s), minutes: SONG_MINUTES, notes: '', done: false });
-      on('[data-action="addsong"]', () => {
-        const q = normalize(app.querySelector('#addsong').value);
-        const s = songs().find((x) => normalize(x.title) === q) || songs().find((x) => q && normalize(x.title).includes(q));
-        if (!s) return msg('No encontré esa canción en el repertorio.');
-        addSong(s);
+      // Buscador de canciones: al tocarlo muestra todo el repertorio en orden alfabético
+      // y se va filtrando mientras escribes; tocar una canción la agrega con su tono.
+      const songInput = app.querySelector('#addsong');
+      const hits = app.querySelector('#songhits');
+      const inPlan = new Set(plan.items.map((i) => i.songId).filter(Boolean));
+      const drawHits = () => {
+        const words = normalize(songInput.value).split(/\s+/).filter(Boolean);
+        const found = songs()
+          .filter((x) => words.every((w) => normalize(`${x.title} ${x.author || ''}`).includes(w)))
+          .sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }));
+        hits.hidden = false;
+        hits.innerHTML = found.length
+          ? found
+              .map(
+                (x) => `<li><button type="button" class="addpick" data-songhit="${esc(x.id)}">
+                  <span class="song-main"><span class="song-title">${esc(x.title)}${inPlan.has(x.id) ? ' <small class="hint">· ya está</small>' : ''}</span>
+                  <span class="song-sub">${esc(x.author || '')}</span></span>
+                  <span class="song-meta">${x.key ? `<span class="key">${esc(songKey(x))}</span>` : ''}</span>
+                </button></li>`,
+              )
+              .join('')
+          : '<li class="hint">No encontré esa canción en el repertorio.</li>';
+      };
+      songInput.addEventListener('focus', drawHits);
+      songInput.addEventListener('input', drawHits);
+      hits.addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-songhit]');
+        const x = b && findSong(b.dataset.songhit);
+        if (!x) return;
+        addSong(x);
         changed();
+        msg(`Agregada: ${x.title}`);
+      });
+      songInput.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') hits.querySelector('[data-songhit]')?.click();
+        if (ev.key === 'Escape') hits.hidden = true;
       });
       on('[data-action="addtopic"]', () => {
         const text = app.querySelector('#addtopic').value.trim();
@@ -426,7 +463,6 @@ export function setupEnsayo(deps) {
         changed();
       });
       app.querySelector('#addtopic').addEventListener('keydown', (ev) => ev.key === 'Enter' && app.querySelector('[data-action="addtopic"]').click());
-      app.querySelector('#addsong').addEventListener('keydown', (ev) => ev.key === 'Enter' && app.querySelector('[data-action="addsong"]').click());
       on('[data-action="addset"]', () => {
         const set = allSetlists().find((s) => s.id === app.querySelector('#addset').value);
         (set?.items || []).forEach((it) => {
@@ -457,7 +493,7 @@ export function setupEnsayo(deps) {
             when: when.slice(3),
             total: planMinutes(plan),
             available: availableMinutes(e),
-            items: plan.items.map((i, n) => ({ ...i, time: times[n] })),
+            items: plan.items.map((i, n) => ({ ...i, time: time12(times[n]) })),
             pending: pendingTasks(events(), e).map(({ task }) => task),
           });
           const how = await shareFile(blob, { name: `programa ${e.title} ${e.day || ''}` }, 'png', 'image/png');

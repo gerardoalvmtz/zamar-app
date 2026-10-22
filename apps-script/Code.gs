@@ -18,12 +18,12 @@ const AUDIO_HEADERS = ['Composición', 'Etiqueta', 'Archivo', 'Link', 'Fecha', '
 const COMP_EDITABLE = ['Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', 'Acordes', 'Notas'];
 // La agenda vive en el mismo archivo privado, en sus propias pestañas (se crean solas).
 const EVENT_HEADERS = [
-  'ID', 'Evento', 'Tipo', 'Estatus', 'Fecha', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección',
+  'ID', 'Evento', 'Tipo', 'Estatus', 'Fecha', 'Fecha fin', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección',
   'Contacto', 'Teléfono', 'Setlist', 'Notas', 'Creado', 'Actualizado',
 ];
 const EVENT_EDITABLE = EVENT_HEADERS.filter((h) => ['ID', 'Creado', 'Actualizado'].indexOf(h) < 0);
 // Se guardan como texto para que la hoja no las convierta en fechas u horas con otra zona horaria.
-const EVENT_TEXT = ['Fecha', 'Hora', 'Llegada', 'Fin', 'Teléfono'];
+const EVENT_TEXT = ['Fecha', 'Fecha fin', 'Hora', 'Llegada', 'Fin', 'Teléfono'];
 const RSVP_HEADERS = ['Evento', 'Quién', 'Respuesta', 'Rol', 'Fecha'];
 const RSVP_ANSWERS = ['Voy', 'Tal vez', 'No puedo'];
 // Comentarios del equipo sobre una composición o sobre uno de sus audios (Audio = link del audio).

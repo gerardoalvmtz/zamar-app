@@ -36,6 +36,16 @@ export function timeOf(v) {
 }
 
 const asDate = (day) => new Date(day + 'T12:00:00');
+const addDays = (day, n) => ymd(new Date(asDate(day).getTime() + n * 86400000));
+/** Último día del evento: el mismo día, o el día final si dura varios (un retiro de viernes a domingo). */
+export const lastDay = (e) => e.endDay || e.day;
+/** Todos los días que ocupa el evento. */
+export function daysOf(e) {
+  if (!e.day) return [];
+  const out = [e.day];
+  while (out[out.length - 1] < lastDay(e) && out.length < 31) out.push(addDays(out[out.length - 1], 1));
+  return out;
+}
 export const daysUntil = (day, from = today()) => Math.round((asDate(day) - asDate(from)) / 86400000);
 
 export function relative(day, from = today()) {
@@ -49,6 +59,25 @@ export function relative(day, from = today()) {
 
 const longDay = (day) =>
   day ? asDate(day).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Fecha por definir';
+
+/** "viernes 6 al domingo 8 de noviembre de 2026", o la fecha sola si es de un día. */
+export function dateRange(e) {
+  if (!e.day || !e.endDay) return longDay(e.day);
+  const a = asDate(e.day);
+  const b = asDate(e.endDay);
+  const wd = (d) => d.toLocaleDateString('es-MX', { weekday: 'long' });
+  const month = (d) => d.toLocaleDateString('es-MX', { month: 'long' });
+  const tail = `${b.getDate()} de ${month(b)} de ${b.getFullYear()}`;
+  if (a.getFullYear() !== b.getFullYear()) return `${wd(a)} ${a.getDate()} de ${month(a)} de ${a.getFullYear()} al ${wd(b)} ${tail}`;
+  if (a.getMonth() !== b.getMonth()) return `${wd(a)} ${a.getDate()} de ${month(a)} al ${wd(b)} ${tail}`;
+  return `${wd(a)} ${a.getDate()} al ${wd(b)} ${tail}`;
+}
+
+/** Como relative(), pero un evento de varios días que ya empezó dice "En curso". */
+export function whenLabel(e, from = today()) {
+  if (e.endDay && e.day < from && e.endDay >= from) return 'En curso';
+  return relative(e.day, from);
+}
 const shortDay = (day) => (day ? asDate(day).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Sin fecha');
 const monthName = (y, m) => new Date(y, m, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
 
@@ -64,6 +93,7 @@ export function toEvent(r) {
     type: String(r.Tipo || ''),
     status: String(r.Estatus || 'Invitación recibida'),
     day: dayOf(r.Fecha),
+    endDay: dayOf(r['Fecha fin']) > dayOf(r.Fecha) && dayOf(r.Fecha) ? dayOf(r['Fecha fin']) : '',
     time: timeOf(r.Hora),
     arrive: timeOf(r.Llegada),
     end: timeOf(r.Fin),
@@ -76,10 +106,10 @@ export function toEvent(r) {
   };
 }
 
-/** El siguiente evento vigente (hoy en adelante), sin contar cancelados. */
+/** El siguiente evento vigente (hoy en adelante, o en curso), sin contar cancelados. */
 export function nextEvent(events, from = today()) {
   return events
-    .filter((e) => e.day && e.day >= from && active(e))
+    .filter((e) => e.day && lastDay(e) >= from && active(e))
     .sort((a, b) => a.day.localeCompare(b.day) || (a.time || '99').localeCompare(b.time || '99'))[0] || null;
 }
 
@@ -102,19 +132,30 @@ function addHours(day, time, h) {
   return [ymd(d), `${pad(d.getHours())}:${pad(d.getMinutes())}`];
 }
 
+/**
+ * Inicio y fin para el calendario. Con hora: del inicio del primer día a la hora de fin del
+ * último (si no hay fin, dos horas). Sin hora: días completos, hasta el día siguiente al último.
+ */
+function calendarDates(e) {
+  if (e.time) {
+    if (e.endDay) return [stamp(e.day, e.time), e.end ? stamp(e.endDay, e.end) : stamp(e.endDay)];
+    const [d2, t2] = e.end ? [e.end < e.time ? addHours(e.day, e.end, 24)[0] : e.day, e.end] : addHours(e.day, e.time, 2);
+    return [stamp(e.day, e.time), stamp(d2, t2)];
+  }
+  return [stamp(e.day), stamp(addDays(lastDay(e), 1))];
+}
+
+function calendarSpan(e) {
+  const [a, b] = calendarDates(e);
+  const allDay = !a.includes('T');
+  // Un evento con hora de inicio pero sin hora de fin termina el último día completo.
+  if (!allDay && !b.includes('T')) return [`DTSTART:${a}`, `DTEND;VALUE=DATE:${stamp(addDays(lastDay(e), 1))}`];
+  return allDay ? [`DTSTART;VALUE=DATE:${a}`, `DTEND;VALUE=DATE:${b}`] : [`DTSTART:${a}`, `DTEND:${b}`];
+}
+
 /** Archivo de calendario para iPhone, Outlook o cualquier app. */
 export function toIcs(e) {
-  let start;
-  let end;
-  if (e.time) {
-    const [d2, t2] = e.end ? [e.end < e.time ? addHours(e.day, e.end, 24)[0] : e.day, e.end] : addHours(e.day, e.time, 2);
-    start = `DTSTART:${stamp(e.day, e.time)}`;
-    end = `DTEND:${stamp(d2, t2)}`;
-  } else {
-    const next = new Date(asDate(e.day).getTime() + 86400000);
-    start = `DTSTART;VALUE=DATE:${stamp(e.day)}`;
-    end = `DTEND;VALUE=DATE:${stamp(ymd(next))}`;
-  }
+  const [start, end] = calendarSpan(e);
   const desc = [e.status, e.arrive && `Llegar ${e.arrive}`, e.contact && `Contacto: ${e.contact} ${e.phone}`, e.notes].filter(Boolean).join('\n');
   return [
     'BEGIN:VCALENDAR',
@@ -134,9 +175,9 @@ export function toIcs(e) {
 }
 
 function googleCalendarUrl(e) {
-  const dates = e.time
-    ? `${stamp(e.day, e.time)}/${stamp(...(e.end ? [e.day, e.end] : addHours(e.day, e.time, 2)))}`
-    : `${stamp(e.day)}/${stamp(ymd(new Date(asDate(e.day).getTime() + 86400000)))}`;
+  let [a, b] = calendarDates(e);
+  if (a.includes('T') && !b.includes('T')) b = stamp(lastDay(e), '23:59');
+  const dates = `${a}/${b}`;
   const q = new URLSearchParams({
     action: 'TEMPLATE',
     text: 'Zamar · ' + e.title,
@@ -189,7 +230,7 @@ export function setupAgenda(ctx) {
   // Guarda en el teléfono lo que se acaba de cambiar, para que la copia no se quede atrás.
   function saveCache() {
     const back = (e) => ({
-      ID: e.id, Evento: e.title, Tipo: e.type, Estatus: e.status, Fecha: e.day, Hora: e.time, Llegada: e.arrive, Fin: e.end,
+      ID: e.id, Evento: e.title, Tipo: e.type, Estatus: e.status, Fecha: e.day, 'Fecha fin': e.endDay, Hora: e.time, Llegada: e.arrive, Fin: e.end,
       Lugar: e.place, 'Dirección': e.address, Contacto: e.contact, 'Teléfono': e.phone, Setlist: e.setlist, Notas: e.notes,
     });
     store.set(CACHE, { events: data.events.map(back), rsvps: data.rsvps, at: new Date().toISOString() });
@@ -233,6 +274,11 @@ export function setupAgenda(ctx) {
   function dateBlock(e) {
     if (!e.day) return '<span class="datebox muted"><b>?</b><small>sin fecha</small></span>';
     const d = asDate(e.day);
+    if (e.endDay) {
+      const f = asDate(e.endDay);
+      const wd = (x) => x.toLocaleDateString('es-MX', { weekday: 'short' }).replace('.', '');
+      return `<span class="datebox range"><b>${d.getDate()}–${f.getDate()}</b><small>${esc(wd(d))}–${esc(wd(f))}</small></span>`;
+    }
     return `<span class="datebox"><b>${d.getDate()}</b><small>${esc(d.toLocaleDateString('es-MX', { weekday: 'short' }).replace('.', ''))}</small></span>`;
   }
 
@@ -261,9 +307,9 @@ export function setupAgenda(ctx) {
     }
     const names = going(e.id).map((r) => r['Quién']);
     return `<a class="card nextcard" href="#/agenda/${encodeURIComponent(e.id)}">
-      <span class="label">Próximo evento · ${esc(relative(e.day))}</span>
+      <span class="label">Próximo evento · ${esc(whenLabel(e))}</span>
       <span class="nexttitle">${esc(e.title)}</span>
-      <span class="nextwhen">${esc(longDay(e.day))}${e.time ? ` · ${esc(e.time)}` : ''}${e.arrive ? ` (llegar ${esc(e.arrive)})` : ''}</span>
+      <span class="nextwhen">${esc(dateRange(e))}${e.time ? ` · ${esc(e.time)}` : ''}${e.arrive ? ` (llegar ${esc(e.arrive)})` : ''}</span>
       ${e.place ? `<span class="nextwhere">📍 ${esc(e.place)}</span>` : ''}
       <span class="nextfoot">
         <span class="pill ${statusClass(e.status)}">${esc(e.status)}</span>
@@ -283,7 +329,7 @@ export function setupAgenda(ctx) {
     const offset = (first.getDay() + 6) % 7; // semana empieza en lunes
     const days = new Date(y, m + 1, 0).getDate();
     const byDay = {};
-    events.forEach((e) => e.day && (byDay[e.day] ||= []).push(e));
+    events.forEach((e) => daysOf(e).forEach((d) => (byDay[d] ||= []).push(e)));
     const cells = [];
     for (let i = 0; i < offset; i++) cells.push('<span></span>');
     for (let d = 1; d <= days; d++) {
@@ -292,8 +338,8 @@ export function setupAgenda(ctx) {
       cells.push(`<button class="cal-day ${key === t ? 'today' : ''} ${key === view.day ? 'picked' : ''}" data-day="${key}" ${evs.length ? '' : 'data-empty'}>
         <span>${d}</span>${evs.length ? `<i class="${statusClass(evs[0].status)}"></i>` : ''}</button>`);
     }
-    const inMonth = events.filter((e) => e.day && e.day.startsWith(`${y}-${pad(m + 1)}`)).sort(byDate);
-    const shown = view.day ? inMonth.filter((e) => e.day === view.day) : inMonth;
+    const inMonth = events.filter((e) => daysOf(e).some((d) => d.startsWith(`${y}-${pad(m + 1)}`))).sort(byDate);
+    const shown = view.day ? inMonth.filter((e) => daysOf(e).includes(view.day)) : inMonth;
     return `<section class="calendar">
         <div class="cal-head">
           <button data-month="-1" aria-label="Mes anterior">‹</button>
@@ -309,8 +355,8 @@ export function setupAgenda(ctx) {
 
   function listView(events) {
     const t = today();
-    const upcoming = events.filter((e) => !e.day || e.day >= t).sort(byDate);
-    const past = events.filter((e) => e.day && e.day < t).sort((a, b) => byDate(b, a));
+    const upcoming = events.filter((e) => !e.day || lastDay(e) >= t).sort(byDate);
+    const past = events.filter((e) => e.day && lastDay(e) < t).sort((a, b) => byDate(b, a));
     let lastMonth = '';
     const rows = upcoming
       .map((e) => {
@@ -443,7 +489,7 @@ export function setupAgenda(ctx) {
     const names = going(e.id).map((r) => r['Quién']);
     return [
       `🎶 Zamar · ${e.title}`,
-      `📅 ${longDay(e.day)}${e.time ? `, ${e.time}` : ''}${e.arrive ? ` (llegar ${e.arrive})` : ''}`,
+      `📅 ${dateRange(e)}${e.time ? `, ${e.time}` : ''}${e.arrive ? ` (llegar ${e.arrive})` : ''}`,
       e.place && `📍 ${e.place}${e.address && !/^https?:/.test(e.address) ? `, ${e.address}` : ''}`,
       `Estatus: ${e.status}`,
       names.length && `👥 Van: ${names.join(', ')}`,
@@ -465,7 +511,7 @@ export function setupAgenda(ctx) {
         ${backHeader('#/agenda', 'Agenda')}
         <article class="detail">
           <h1>${esc(e.title)}</h1>
-          <p class="author">${esc(e.type || 'Evento')}${e.day ? ` · ${esc(relative(e.day))}` : ''}</p>
+          <p class="author">${esc(e.type || 'Evento')}${e.day ? ` · ${esc(whenLabel(e))}` : ''}${e.endDay ? ` · ${daysOf(e).length} días` : ''}</p>
           <p class="status"><span class="dot ${statusClass(e.status)}"></span> ${esc(e.status)}
             <a class="editlink" href="#/agenda/${encodeURIComponent(e.id)}/editar">✎ Editar</a></p>
           <div class="chips statuspick">
@@ -473,11 +519,11 @@ export function setupAgenda(ctx) {
           </div>
 
           <section class="card when">
-            <div><span class="label">Fecha</span><strong>${esc(longDay(e.day))}</strong></div>
+            <div><span class="label">${e.endDay ? 'Fechas' : 'Fecha'}</span><strong>${esc(dateRange(e))}</strong></div>
             <div class="times">
               <div><span class="label">Llegar</span><strong>${esc(e.arrive || '—')}</strong></div>
-              <div><span class="label">Inicia</span><strong>${esc(e.time || '—')}</strong></div>
-              <div><span class="label">Termina</span><strong>${esc(e.end || '—')}</strong></div>
+              <div><span class="label">${e.endDay ? 'Inicia el primer día' : 'Inicia'}</span><strong>${esc(e.time || '—')}</strong></div>
+              <div><span class="label">${e.endDay ? 'Termina el último día' : 'Termina'}</span><strong>${esc(e.end || '—')}</strong></div>
             </div>
           </section>
 
@@ -630,7 +676,10 @@ export function setupAgenda(ctx) {
             <label class="field"><span>Tipo</span><select name="Tipo"><option value=""></option>${opt(TYPES, v.type)}</select></label>
             <label class="field"><span>Estatus</span><select name="Estatus">${opt(STATUSES, v.status)}</select></label>
           </div>
-          <label class="field"><span>Fecha</span><input type="date" name="Fecha" value="${esc(v.day)}"></label>
+          <div class="row">
+            <label class="field"><span>Fecha</span><input type="date" name="Fecha" value="${esc(v.day)}"></label>
+            <label class="field"><span>Hasta (si dura varios días)</span><input type="date" name="Fecha fin" value="${esc(v.endDay)}" min="${esc(v.day)}"></label>
+          </div>
           <div class="row three even">
             <label class="field"><span>Llegar</span><input type="time" name="Llegada" value="${esc(v.arrive)}"></label>
             <label class="field"><span>Inicia</span><input type="time" name="Hora" value="${esc(v.time)}"></label>
@@ -652,12 +701,15 @@ export function setupAgenda(ctx) {
         </form>`;
       const form = app.querySelector('#editor');
       const msg = (t) => (app.querySelector('#editmsg').textContent = t);
-      const NAMES = ['Evento', 'Tipo', 'Estatus', 'Fecha', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección', 'Contacto', 'Teléfono', 'Notas'];
+      form.elements.Fecha.addEventListener('change', () => (form.elements['Fecha fin'].min = form.elements.Fecha.value));
+      const NAMES = ['Evento', 'Tipo', 'Estatus', 'Fecha', 'Fecha fin', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección', 'Contacto', 'Teléfono', 'Notas'];
 
       form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const fields = {};
         NAMES.forEach((n) => (fields[n] = form.elements[n].value.trim()));
+        // Un día final igual o anterior al inicio no cuenta: el evento es de un solo día.
+        if (!fields.Fecha || fields['Fecha fin'] <= fields.Fecha) fields['Fecha fin'] = '';
         const button = form.querySelector('[type="submit"]');
         button.disabled = true;
         msg('Guardando…');
@@ -697,7 +749,7 @@ export function setupAgenda(ctx) {
     if (!e) return '';
     return `<a class="nextstrip" href="#/agenda/${encodeURIComponent(e.id)}">
       <span class="dot ${statusClass(e.status)}"></span>
-      <span><strong>${esc(relative(e.day))}</strong> · ${esc(e.title)}${e.time ? ` · ${esc(e.time)}` : ''}</span>
+      <span><strong>${esc(whenLabel(e))}</strong> · ${esc(e.title)}${e.time ? ` · ${esc(e.time)}` : ''}</span>
       <span aria-hidden="true">›</span>
     </a>`;
   }

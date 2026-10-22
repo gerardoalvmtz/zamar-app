@@ -108,7 +108,8 @@ papelera de Drive.
 ### Agenda
 
 También con PIN. Cada evento lleva tipo, estatus (Invitación recibida, Pendiente de detalles, Confirmado,
-Realizado, Cancelado), fecha, hora de llegada, inicio y fin, lugar, contacto y notas. Arriba se ve el
+Realizado, Cancelado), fecha (o varias, para un retiro de viernes a domingo), hora de llegada, inicio y fin,
+lugar, contacto y notas. Arriba se ve el
 **próximo evento** con su cuenta regresiva y quién va; la lista se puede ver por mes o como calendario.
 En cada evento cada quien marca **Voy / Tal vez / No puedo** con lo que toca, se puede vincular un setlist,
 compartir el resumen por WhatsApp, agregarlo al calendario del teléfono y abrir el lugar en Maps.

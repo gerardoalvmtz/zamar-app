@@ -6,7 +6,7 @@ import { setupApi } from './api.js';
 import { normalize } from './songs.js';
 import { keyName } from './music.js';
 import { allSetlists, encodeSetlist } from './setlists.js';
-import { setupEnsayo, parsePlan, hasPlan, planMinutes } from './ensayo.js';
+import { setupEnsayo, parsePlan, hasPlan, planMinutes, time12 } from './ensayo.js';
 
 export const STATUSES = ['Invitación recibida', 'Pendiente de detalles', 'Confirmado', 'Realizado', 'Cancelado'];
 export const TYPES = ['Misa', 'Hora santa', 'Retiro', 'Congreso', 'Concierto', 'Boda', 'XV años', 'Evangelización', 'Ensayo', 'Otro'];
@@ -85,6 +85,8 @@ const monthName = (y, m) => new Date(y, m, 1).toLocaleDateString('es-MX', { mont
 export const statusClass = (s) =>
   ({ Confirmado: 'ok', 'Pendiente de detalles': 'warn', 'Invitación recibida': 'warn', Cancelado: 'bad', Realizado: 'none' })[s] || 'none';
 
+const isRehearsal = (e) => e.type === 'Ensayo';
+const MAX_REPEAT = 52;
 const active = (e) => e.status !== 'Cancelado' && e.status !== 'Realizado';
 
 export function toEvent(r) {
@@ -158,7 +160,7 @@ function calendarSpan(e) {
 /** Archivo de calendario para iPhone, Outlook o cualquier app. */
 export function toIcs(e) {
   const [start, end] = calendarSpan(e);
-  const desc = [e.status, e.arrive && `Llegar ${e.arrive}`, e.contact && `Contacto: ${e.contact} ${e.phone}`, e.notes].filter(Boolean).join('\n');
+  const desc = [e.status, e.arrive && `Llegar ${time12(e.arrive)}`, e.contact && `Contacto: ${e.contact} ${e.phone}`, e.notes].filter(Boolean).join('\n');
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -185,7 +187,7 @@ function googleCalendarUrl(e) {
     text: 'Zamar · ' + e.title,
     dates,
     location: [e.place, e.address].filter(Boolean).join(', '),
-    details: [e.status, e.arrive && `Llegar ${e.arrive}`, e.notes].filter(Boolean).join('\n'),
+    details: [e.status, e.arrive && `Llegar ${time12(e.arrive)}`, e.notes].filter(Boolean).join('\n'),
   });
   return 'https://calendar.google.com/calendar/render?' + q;
 }
@@ -287,7 +289,7 @@ export function setupAgenda(ctx) {
 
   function eventRow(e) {
     const n = going(e.id).length;
-    const sub = [e.time, e.place].filter(Boolean).join(' · ') || e.type || 'Detalles por definir';
+    const sub = [time12(e.time), e.place].filter(Boolean).join(' · ') || e.type || 'Detalles por definir';
     return `<a class="song event ${e.status === 'Cancelado' ? 'cancelled' : ''}" href="#/agenda/${encodeURIComponent(e.id)}">
       ${dateBlock(e)}
       <span class="song-main">
@@ -312,10 +314,10 @@ export function setupAgenda(ctx) {
     return `<a class="card nextcard" href="#/agenda/${encodeURIComponent(e.id)}">
       <span class="label">Próximo evento · ${esc(whenLabel(e))}</span>
       <span class="nexttitle">${esc(e.title)}</span>
-      <span class="nextwhen">${esc(dateRange(e))}${e.time ? ` · ${esc(e.time)}` : ''}${e.arrive ? ` (llegar ${esc(e.arrive)})` : ''}</span>
+      <span class="nextwhen">${esc(dateRange(e))}${e.time ? ` · ${esc(time12(e.time))}` : ''}${e.arrive ? ` (llegar ${esc(time12(e.arrive))})` : ''}</span>
       ${e.place ? `<span class="nextwhere">📍 ${esc(e.place)}</span>` : ''}
       <span class="nextfoot">
-        <span class="pill ${statusClass(e.status)}">${esc(e.status)}</span>
+        ${isRehearsal(e) && e.status !== 'Cancelado' ? '' : `<span class="pill ${statusClass(e.status)}">${esc(e.status)}</span>`}
         <span>${names.length ? `👥 ${esc(names.join(', '))}` : 'Nadie ha confirmado asistencia'}</span>
       </span>
     </a>`;
@@ -511,9 +513,9 @@ export function setupAgenda(ctx) {
     const names = going(e.id).map((r) => r['Quién']);
     return [
       `🎶 Zamar · ${e.title}`,
-      `📅 ${dateRange(e)}${e.time ? `, ${e.time}` : ''}${e.arrive ? ` (llegar ${e.arrive})` : ''}`,
+      `📅 ${dateRange(e)}${e.time ? `, ${time12(e.time)}` : ''}${e.arrive ? ` (llegar ${time12(e.arrive)})` : ''}`,
       e.place && `📍 ${e.place}${e.address && !/^https?:/.test(e.address) ? `, ${e.address}` : ''}`,
-      `Estatus: ${e.status}`,
+      (!isRehearsal(e) || e.status === 'Cancelado') && `Estatus: ${e.status}`,
       names.length && `👥 Van: ${names.join(', ')}`,
     ]
       .filter(Boolean)
@@ -534,18 +536,25 @@ export function setupAgenda(ctx) {
         <article class="detail">
           <h1>${esc(e.title)}</h1>
           <p class="author">${esc(e.type || 'Evento')}${e.day ? ` · ${esc(whenLabel(e))}` : ''}${e.endDay ? ` · ${daysOf(e).length} días` : ''}</p>
-          <p class="status"><span class="dot ${statusClass(e.status)}"></span> ${esc(e.status)}
-            <a class="editlink" href="#/agenda/${encodeURIComponent(e.id)}/editar">✎ Editar</a></p>
-          <div class="chips statuspick">
-            ${STATUSES.map((s) => `<button class="chip toggle" data-status="${esc(s)}" aria-pressed="${s === e.status}">${esc(s)}</button>`).join('')}
-          </div>
+          ${
+            isRehearsal(e)
+              ? // En un ensayo el estatus de invitación no aplica: solo se puede cancelar ese día.
+                `<p class="status">${e.status === 'Cancelado' ? `<span class="dot bad"></span> Cancelado` : ''}
+                  <button class="chip" data-status="${e.status === 'Cancelado' ? 'Confirmado' : 'Cancelado'}">${e.status === 'Cancelado' ? 'Reactivar ensayo' : 'Cancelar este ensayo'}</button>
+                  <a class="editlink" href="#/agenda/${encodeURIComponent(e.id)}/editar">✎ Editar</a></p>`
+              : `<p class="status"><span class="dot ${statusClass(e.status)}"></span> ${esc(e.status)}
+                  <a class="editlink" href="#/agenda/${encodeURIComponent(e.id)}/editar">✎ Editar</a></p>
+                <div class="chips statuspick">
+                  ${STATUSES.map((s) => `<button class="chip toggle" data-status="${esc(s)}" aria-pressed="${s === e.status}">${esc(s)}</button>`).join('')}
+                </div>`
+          }
 
           <section class="card when">
             <div><span class="label">${e.endDay ? 'Fechas' : 'Fecha'}</span><strong>${esc(dateRange(e))}</strong></div>
             <div class="times">
-              <div><span class="label">Llegar</span><strong>${esc(e.arrive || '—')}</strong></div>
-              <div><span class="label">${e.endDay ? 'Inicia el primer día' : 'Inicia'}</span><strong>${esc(e.time || '—')}</strong></div>
-              <div><span class="label">${e.endDay ? 'Termina el último día' : 'Termina'}</span><strong>${esc(e.end || '—')}</strong></div>
+              <div><span class="label">Llegar</span><strong>${esc(time12(e.arrive) || '—')}</strong></div>
+              <div><span class="label">${e.endDay ? 'Inicia el primer día' : 'Inicia'}</span><strong>${esc(time12(e.time) || '—')}</strong></div>
+              <div><span class="label">${e.endDay ? 'Termina el último día' : 'Termina'}</span><strong>${esc(time12(e.end) || '—')}</strong></div>
             </div>
           </section>
 
@@ -697,12 +706,25 @@ export function setupAgenda(ctx) {
           <label class="field"><span>Evento</span><input name="Evento" value="${esc(v.title)}" required placeholder="Por ejemplo: Retiro de jóvenes, Parroquia San José"></label>
           <div class="row">
             <label class="field"><span>Tipo</span><select name="Tipo"><option value=""></option>${opt(TYPES, v.type)}</select></label>
-            <label class="field"><span>Estatus</span><select name="Estatus">${opt(STATUSES, v.status)}</select></label>
+            <label class="field" data-noensayo><span>Estatus</span><select name="Estatus">${opt(STATUSES, v.status)}</select></label>
           </div>
           <div class="row">
             <label class="field"><span>Fecha</span><input type="date" name="Fecha" value="${esc(v.day)}"></label>
-            <label class="field"><span>Hasta (si dura varios días)</span><input type="date" name="Fecha fin" value="${esc(v.endDay)}" min="${esc(v.day)}"></label>
+            <label class="field" data-noensayo><span>Hasta (si dura varios días)</span><input type="date" name="Fecha fin" value="${esc(v.endDay)}" min="${esc(v.day)}"></label>
           </div>
+          ${
+            e
+              ? ''
+              : `<div class="row" data-onlyensayo>
+                  <label class="field"><span>Repetir</span><select name="repeat">
+                    <option value="0">No se repite</option>
+                    <option value="7">Cada semana</option>
+                    <option value="14">Cada 2 semanas</option>
+                  </select></label>
+                  <label class="field"><span>Repetir hasta</span><input type="date" name="repeatUntil"></label>
+                </div>
+                <p class="hint" data-onlyensayo id="repeatmsg"></p>`
+          }
           <div class="row three even">
             <label class="field"><span>Llegar</span><input type="time" name="Llegada" value="${esc(v.arrive)}"></label>
             <label class="field"><span>Inicia</span><input type="time" name="Hora" value="${esc(v.time)}"></label>
@@ -725,6 +747,35 @@ export function setupAgenda(ctx) {
       const form = app.querySelector('#editor');
       const msg = (t) => (app.querySelector('#editmsg').textContent = t);
       form.elements.Fecha.addEventListener('change', () => (form.elements['Fecha fin'].min = form.elements.Fecha.value));
+      // Los ensayos no llevan estatus de invitación, y solo un ensayo nuevo se puede repetir.
+      const repeatDays = () => {
+        const step = Number(form.elements.repeat?.value || 0);
+        const from = form.elements.Fecha.value;
+        const until = form.elements.repeatUntil?.value;
+        if (!step || !from || !until || until <= from) return [from];
+        const out = [from];
+        while (out.length < MAX_REPEAT && addDays(out[out.length - 1], step) <= until) out.push(addDays(out[out.length - 1], step));
+        return out;
+      };
+      const typeChanged = () => {
+        const ens = form.elements.Tipo.value === 'Ensayo';
+        app.querySelectorAll('[data-noensayo]').forEach((el) => (el.hidden = ens));
+        app.querySelectorAll('[data-onlyensayo]').forEach((el) => (el.hidden = !ens));
+        const until = form.elements.repeatUntil;
+        if (until) {
+          until.min = form.elements.Fecha.value;
+          if (!until.value && form.elements.Fecha.value) until.value = addDays(form.elements.Fecha.value, 56);
+          const n = repeatDays().length;
+          app.querySelector('#repeatmsg').textContent =
+            Number(form.elements.repeat.value) && !form.elements.Fecha.value
+              ? 'Elige la fecha del primer ensayo.'
+              : n > 1
+                ? `Se crearán ${n} ensayos, uno por fecha. Después puedes cambiar o cancelar cualquiera por separado.`
+                : '';
+        }
+      };
+      ['Tipo', 'Fecha', 'repeat', 'repeatUntil'].forEach((n) => form.elements[n]?.addEventListener('change', typeChanged));
+      typeChanged();
       const NAMES = ['Evento', 'Tipo', 'Estatus', 'Fecha', 'Fecha fin', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección', 'Contacto', 'Teléfono', 'Notas'];
 
       form.addEventListener('submit', async (ev) => {
@@ -732,19 +783,27 @@ export function setupAgenda(ctx) {
         const fields = {};
         NAMES.forEach((n) => (fields[n] = form.elements[n].value.trim()));
         // Un día final igual o anterior al inicio no cuenta: el evento es de un solo día.
-        if (!fields.Fecha || fields['Fecha fin'] <= fields.Fecha) fields['Fecha fin'] = '';
+        if (!fields.Fecha || fields['Fecha fin'] <= fields.Fecha || fields.Tipo === 'Ensayo') fields['Fecha fin'] = '';
+        if (fields.Tipo === 'Ensayo') fields.Estatus = e?.status === 'Cancelado' ? 'Cancelado' : 'Confirmado';
+        const days = e || fields.Tipo !== 'Ensayo' ? [fields.Fecha] : repeatDays();
         const button = form.querySelector('[type="submit"]');
         button.disabled = true;
         msg('Guardando…');
+        let firstId = '';
         try {
-          const res = await api('saveEvent', { id: e?.id || '', fields });
-          const updated = toEvent({ ID: res.id, ...fields, Setlist: e?.setlist || '', Ensayo: e?.plan || '' });
-          if (e) Object.assign(e, updated);
-          else data.events.push(updated);
-          saveCache();
-          location.hash = `#/agenda/${encodeURIComponent(res.id)}`;
+          for (const [n, day] of days.entries()) {
+            if (days.length > 1) msg(`Guardando ensayo ${n + 1} de ${days.length}…`);
+            const f = { ...fields, Fecha: day };
+            const res = await api('saveEvent', { id: e?.id || '', fields: f });
+            const updated = toEvent({ ID: res.id, ...f, Setlist: e?.setlist || '', Ensayo: e?.plan || '' });
+            if (e) Object.assign(e, updated);
+            else data.events.push(updated);
+            firstId ||= res.id;
+            saveCache();
+          }
+          location.hash = `#/agenda/${encodeURIComponent(firstId)}`;
         } catch (err) {
-          msg(err.message);
+          msg(firstId ? `Se guardaron algunos ensayos, pero falló uno: ${err.message}` : err.message);
           button.disabled = false;
         }
       });
@@ -772,7 +831,7 @@ export function setupAgenda(ctx) {
     if (!e) return '';
     return `<a class="nextstrip" href="#/agenda/${encodeURIComponent(e.id)}">
       <span class="dot ${statusClass(e.status)}"></span>
-      <span><strong>${esc(whenLabel(e))}</strong> · ${esc(e.title)}${e.time ? ` · ${esc(e.time)}` : ''}</span>
+      <span><strong>${esc(whenLabel(e))}</strong> · ${esc(e.title)}${e.time ? ` · ${esc(time12(e.time))}` : ''}</span>
       <span aria-hidden="true">›</span>
     </a>`;
   }

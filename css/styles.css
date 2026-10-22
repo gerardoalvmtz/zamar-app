@@ -680,6 +680,9 @@ details.transition .bridge { margin-top: 8px; font-size: 0.9rem; color: var(--te
 .path li.from b, .path li.to b { color: var(--on-accent); }
 .path li.from small, .path li.to small { color: var(--on-accent); opacity: 0.7; }
 .bridge .tip { margin: 0; }
+.path .glue { font-size: 0.62rem; line-height: 1.1; color: var(--muted); white-space: nowrap; }
+.path li.to .glue, .path li.from .glue { color: var(--on-accent); opacity: 0.7; }
+.route .keys { font: 0.74rem/1.4 var(--mono); overflow-wrap: anywhere; }
 .nextup { margin-top: 24px; padding-top: 4px; border-top: 2px solid var(--line); }
 .nextsong { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; text-decoration: none; }
 .nextup details.more { margin-top: 10px; }

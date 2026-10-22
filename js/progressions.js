@@ -198,6 +198,7 @@ function sample(midi) {
 
 /** Notas del acorde: acorde alrededor del Do central y el bajo una o dos octavas abajo. */
 export function voicing(c) {
+  if (c.notes) return c.notes; // ya viene con las voces acomodadas (puentes entre tonos)
   return c.pcs.map((pc) => 60 + mod(pc) + (mod(pc) < 5 ? 12 : 0)).concat(36 + mod(c.bass) + (mod(c.bass) < 4 ? 12 : 0));
 }
 

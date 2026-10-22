@@ -71,9 +71,14 @@ Se pide un PIN que el ministerio comparte. Todo se guarda en el mismo Sheets y q
 ### Puentes entre tonos
 
 Cuando dos canciones seguidas de un setlist están en tonos distintos, la app propone el camino de acordes para
-pasar de una a otra sin que suene brusco: con un acorde en común (pivote), cambiando la tónica a menor o mayor,
-con ii–V, o con la dominante suspendida. Cada acorde muestra su función (por ejemplo *V7 de A*) y se sugiere una
-nota que voces o teclado pueden sostener mientras cambia el bajo, más un consejo si cambia mucho el tempo.
+pasar de una a otra sin que suene brusco. Prueba varios recursos (acorde en común, tónica a menor o mayor, notas
+en común con las transformaciones P, R y L, el IV que se vuelve menor, disminuido de paso, aumentado como portal,
+ii–V, dominante suspendida, sustituto tritonal y subida) y mide cada uno nota por nota: recomienda el que menos
+mueve las voces, una idea tomada de *Armonía Ilustrada* de Brian Callipari. Cada acorde muestra su función (por
+ejemplo *V7 de A*) y las notas que comparte con el anterior; cada camino trae las notas para la mano derecha ya
+acomodadas en la inversión más cercana, con el bajo caminando por pasos cuando se puede (G → D/F# → Dm → A), y un
+botón ▶ Escuchar con piano. También sugiere una nota que voces o teclado pueden sostener, y un consejo si cambia
+mucho el tempo.
 Se ve en tres lugares: al tocar una canción del setlist (abajo, "Para llegar a la siguiente"), en el setlist
 (tocando "ver puente" entre canciones) y en la página **Puente entre tonos** para probar cualquier par de tonos.
 

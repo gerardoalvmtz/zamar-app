@@ -24,6 +24,7 @@ import { setupCompositions } from './compositions.js';
 import { setupAgenda } from './agenda.js';
 import { setupRehearsals } from './rehearsals.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
+import { playProgression, stopPlaying } from './progressions.js';
 import { setlistImage, setlistPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
 const CACHE_KEY = 'zamar:repertorio';
@@ -482,8 +483,8 @@ function renderSong(id, ctx = null, came = null) {
   const bridgeBlock = (b, bpmA, bpmB) =>
     (b
       ? `<p class="hint">${esc(CLOSENESS[b.closeness])}</p>
-         ${bridgeHtml({ ...b, options: b.options.slice(0, 1) }, esc)}
-         ${b.options.length > 1 ? `<details class="more"><summary>Ver otros caminos</summary>${bridgeHtml({ ...b, options: b.options.slice(1), tip: '' }, esc, { recommend: false })}</details>` : ''}`
+         ${bridgeHtml({ ...b, options: b.options.slice(0, 1) }, esc, { bpm: bpmA })}
+         ${b.options.length > 1 ? `<details class="more"><summary>Ver otros caminos</summary>${bridgeHtml({ ...b, options: b.options.slice(1), tip: '' }, esc, { recommend: false, bpm: bpmA })}</details>` : ''}`
       : '<p class="hint">Falta el tono de alguna de las dos canciones para calcular el puente.</p>') +
     (tempoTip(bpmA, bpmB) ? `<p class="hint tip">🥁 ${esc(tempoTip(bpmA, bpmB))}</p>` : '');
 
@@ -1179,6 +1180,7 @@ function render({ navigated = false } = {}) {
 }
 
 window.addEventListener('hashchange', () => {
+  stopPlaying();
   render({ navigated: true });
   if (/^#\/(sets|set\/[^/]+)$/.test(location.hash)) syncSets();
 });
@@ -1206,6 +1208,34 @@ app.addEventListener('click', async (e) => {
     else state.filters[g].add(chip.dataset.value);
     saveFilters();
     renderList();
+    return;
+  }
+  // ▶ Escuchar un puente entre tonos: cada acorde dura un compás, con las voces ya acomodadas.
+  const listen = e.target.closest('[data-bridgeplay]');
+  if (listen) {
+    const wasPlaying = listen._playing;
+    stopPlaying();
+    app.querySelectorAll('[data-bridgeplay]').forEach((b) => {
+      clearTimeout(b._t);
+      b.textContent = '▶ Escuchar';
+      b._playing = false;
+    });
+    if (wasPlaying) return;
+    listen.textContent = 'Cargando piano…';
+    try {
+      const chords = JSON.parse(listen.dataset.bridgeplay).map((notes) => ({ notes }));
+      const secs = await playProgression(chords, Number(listen.dataset.bpm) || 72);
+      if (!secs) return void (listen.textContent = '▶ Escuchar');
+      listen.textContent = '■ Detener';
+      listen._playing = true;
+      listen._t = setTimeout(() => {
+        listen.textContent = '▶ Escuchar';
+        listen._playing = false;
+      }, secs * 1000);
+    } catch {
+      listen.textContent = '▶ Escuchar';
+      alert('No pude cargar el sonido del piano. Revisa tu conexión e intenta otra vez.');
+    }
     return;
   }
   const action = e.target.closest('[data-action]')?.dataset.action;

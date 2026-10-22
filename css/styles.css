@@ -855,5 +855,6 @@ details.recadd .recorder { margin-top: 8px; }
   margin-top: 10px;
 }
 .songpick { display: grid; gap: 8px; margin-bottom: 10px; }
-.songhits { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+.songhits { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; grid-auto-rows: max-content; -webkit-overflow-scrolling: touch; }
+.songhits > li { flex: none; }
 [hidden] { display: none !important; }

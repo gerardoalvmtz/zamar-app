@@ -849,3 +849,8 @@ details.recadd .recorder { margin-top: 8px; }
 .ensayo section .row input, .ensayo section .row select { min-width: 0; width: 100%; }
 .ensayo section .row > button { padding-inline: 14px; }
 .ensayo .button { text-align: center; }
+.ensayo .startbtn {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}

@@ -5,6 +5,7 @@
 import { normalize } from './songs.js';
 import { keyName } from './music.js';
 import { allSetlists } from './setlists.js';
+import { programImage, shareFile } from './setshare.js';
 
 export const TABS = [
   { id: 'programa', label: 'Antes', title: 'Programa' },
@@ -240,9 +241,10 @@ export function setupEnsayo(deps) {
       }
       <section>
         <div class="row">
-          <button type="button" data-action="shareprog" ${plan.items.length ? '' : 'disabled'}>Compartir programa</button>
-          <a class="button ghost" href="#/agenda/${encodeURIComponent(e.id)}/ensayo/durante">Empezar ensayo ›</a>
+          <button type="button" data-action="shareprog" ${plan.items.length ? '' : 'disabled'}>Compartir texto</button>
+          <button type="button" data-action="progimage" ${plan.items.length ? '' : 'disabled'}>Compartir imagen</button>
         </div>
+        <a class="button ghost startbtn" href="#/agenda/${encodeURIComponent(e.id)}/ensayo/durante">Empezar ensayo ›</a>
       </section>`;
   }
 
@@ -445,6 +447,26 @@ export function setupEnsayo(deps) {
         }),
       );
       on('[data-action="shareprog"]', () => share(programText(e, plan, when), msg));
+      on('[data-action="progimage"]', async (b) => {
+        b.disabled = true;
+        msg('Preparando la imagen…');
+        try {
+          const times = startTimes(e, plan);
+          const blob = await programImage({
+            title: e.title,
+            when: when.slice(3),
+            total: planMinutes(plan),
+            available: availableMinutes(e),
+            items: plan.items.map((i, n) => ({ ...i, time: times[n] })),
+            pending: pendingTasks(events(), e).map(({ task }) => task),
+          });
+          const how = await shareFile(blob, { name: `programa ${e.title} ${e.day || ''}` }, 'png', 'image/png');
+          msg(how === 'downloaded' ? 'Imagen descargada. Mándala al grupo de WhatsApp.' : '');
+        } catch {
+          msg('No se pudo crear la imagen.');
+        }
+        b.disabled = false;
+      });
     }
 
     if (tab === 'durante' && plan.items.length) {

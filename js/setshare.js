@@ -122,6 +122,163 @@ export async function setlistImage(set, rows) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
+/** Envuelve un texto en líneas que quepan en el ancho dado (máximo `max` líneas). */
+function wrap(ctx, text, width, max = 2) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (ctx.measureText(next).width <= width || !line) line = next;
+    else {
+      lines.push(line);
+      line = w;
+    }
+  }
+  if (line) lines.push(line);
+  if (lines.length > max) lines.splice(max - 1, lines.length, lines.slice(max - 1).join(' '));
+  return lines.map((l) => fit(ctx, l, width));
+}
+
+/**
+ * Imagen del programa de un ensayo. `info` = { title, when, total, available,
+ * items: [{ time, kind, title, key, minutes, notes }], pending: [{ text, who }] }.
+ * Devuelve un Blob PNG de 1080 px de ancho.
+ */
+export async function programImage(info) {
+  const W = 1080;
+  const pad = 72;
+  const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
+  const sans = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const titleX = pad + 150;
+  const pillW = 120;
+  const textW = W - pad - pillW - 40 - titleX;
+
+  // Primero se mide cada renglón para saber la altura total.
+  ctx.font = `26px ${sans}`;
+  const rows = info.items.map((i) => {
+    ctx.font = `600 36px ${sans}`;
+    const title = wrap(ctx, i.title, textW, 2);
+    ctx.font = `26px ${sans}`;
+    const notes = i.notes ? wrap(ctx, i.notes, textW, 2) : [];
+    return { ...i, lines: title, noteLines: notes, h: Math.max(118, 74 + (title.length - 1) * 44 + notes.length * 34 + (notes.length ? 6 : 0)) };
+  });
+  ctx.font = `30px ${sans}`;
+  const pend = (info.pending || []).map((t) => wrap(ctx, `${t.text}${t.who ? ` — ${t.who}` : ''}`, W - pad * 2 - 50, 2));
+  const whenLines = wrap(ctx, info.when, W - pad * 2, 2);
+
+  const head = 296 + (whenLines.length - 1) * 44 + 60;
+  const listH = rows.reduce((s, r) => s + r.h + 14, 0);
+  const totalH = 110;
+  const pendH = pend.length ? 90 + pend.reduce((s, l) => s + l.length * 40 + 12, 0) : 0;
+  const H = head + listH + totalH + pendH + 110;
+  canvas.width = W;
+  canvas.height = H;
+
+  ctx.fillStyle = '#faf9f7';
+  ctx.fillRect(0, 0, W, H);
+  const logo = await loadImage('img/logo-negro.png');
+  if (logo) ctx.drawImage(logo, pad, 60, (logo.width / logo.height) * 64, 64);
+
+  ctx.fillStyle = '#6d6a66';
+  ctx.font = `600 28px ${sans}`;
+  ctx.fillText('PROGRAMA DE ENSAYO', pad, 180);
+  ctx.fillStyle = '#121212';
+  ctx.font = `600 60px ${serif}`;
+  ctx.fillText(fit(ctx, info.title || 'Ensayo', W - pad * 2), pad, 246);
+  ctx.fillStyle = '#6d6a66';
+  ctx.font = `30px ${sans}`;
+  whenLines.forEach((l, n) => ctx.fillText(l, pad, 296 + n * 44));
+
+  ctx.strokeStyle = '#e6e2dc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad, head - 20);
+  ctx.lineTo(W - pad, head - 20);
+  ctx.stroke();
+
+  let y = head;
+  rows.forEach((r, n) => {
+    if (n % 2 === 0) {
+      ctx.fillStyle = '#f1efeb';
+      ctx.beginPath();
+      ctx.roundRect(pad - 24, y, W - pad * 2 + 48, r.h, 22);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#121212';
+    ctx.font = `600 32px ${sans}`;
+    ctx.fillText(r.time || String(n + 1), pad, y + 58);
+    ctx.fillStyle = '#6d6a66';
+    ctx.font = `24px ${sans}`;
+    ctx.fillText(r.kind === 'song' ? '🎵 Canción' : '💬 Tema', pad, y + 94);
+
+    ctx.fillStyle = '#121212';
+    ctx.font = `600 36px ${sans}`;
+    r.lines.forEach((l, k) => ctx.fillText(l, titleX, y + 58 + k * 44));
+    ctx.fillStyle = '#6d6a66';
+    ctx.font = `26px ${sans}`;
+    r.noteLines.forEach((l, k) => ctx.fillText(l, titleX, y + 52 + r.lines.length * 44 + k * 34));
+
+    // Tono en una pastilla y minutos a la derecha.
+    const px = W - pad - pillW + 24;
+    ctx.textAlign = 'center';
+    if (r.key) {
+      ctx.fillStyle = '#121212';
+      ctx.beginPath();
+      ctx.roundRect(px - pillW / 2 - 70, y + 22, 96, 52, 26);
+      ctx.fill();
+      ctx.fillStyle = '#faf9f7';
+      ctx.font = `700 28px ${sans}`;
+      ctx.fillText(r.key, px - pillW / 2 - 22, y + 58);
+    }
+    ctx.fillStyle = '#121212';
+    ctx.font = `600 32px ${sans}`;
+    ctx.fillText(r.minutes ? String(r.minutes) : '—', px + 10, y + 54);
+    ctx.fillStyle = '#6d6a66';
+    ctx.font = `22px ${sans}`;
+    ctx.fillText('min', px + 10, y + 82);
+    ctx.textAlign = 'left';
+    y += r.h + 14;
+  });
+
+  y += 20;
+  ctx.fillStyle = '#121212';
+  ctx.font = `600 34px ${sans}`;
+  ctx.fillText(`Total: ${info.total} min`, pad, y + 40);
+  if (info.available) {
+    const over = info.total > info.available;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = over ? '#b3261e' : '#6d6a66';
+    ctx.font = `28px ${sans}`;
+    ctx.fillText(over ? `Se pasa ${info.total - info.available} min del horario` : `de ${info.available} min disponibles`, W - pad, y + 40);
+    ctx.textAlign = 'left';
+  }
+  y += totalH;
+
+  if (pend.length) {
+    ctx.fillStyle = '#121212';
+    ctx.font = `600 32px ${sans}`;
+    ctx.fillText('📌 Pendientes del ensayo anterior', pad, y + 30);
+    y += 80;
+    ctx.font = `30px ${sans}`;
+    pend.forEach((lines) => {
+      ctx.fillStyle = '#6d6a66';
+      ctx.fillText('☐', pad, y);
+      ctx.fillStyle = '#121212';
+      lines.forEach((l, k) => ctx.fillText(l, pad + 50, y + k * 40));
+      y += lines.length * 40 + 12;
+    });
+  }
+
+  ctx.fillStyle = '#6d6a66';
+  ctx.font = `26px ${sans}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Zamar Adoración', W / 2, H - 50);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
 let jsPdfReady = null;
 function loadJsPdf() {
   jsPdfReady ||= new Promise((resolve, reject) => {

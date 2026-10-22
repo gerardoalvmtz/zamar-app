@@ -55,6 +55,7 @@ La sección **Agenda** guarda los eventos a los que invitan al ministerio (fecha
 estatus, setlist y notas) y quién va a cada uno. Vive en la misma hoja privada "Zamar · Composiciones",
 en las pestañas *Eventos* y *Asistencia*, que el script crea solo la primera vez que alguien abre la Agenda.
 No hace falta ejecutar nada: basta con pegar el código nuevo y volver a implementar.
+Los eventos de varios días usan la columna *Fecha fin*, que el script agrega sola la primera vez que se guarda uno.
 
 ## Si cambias el código
 

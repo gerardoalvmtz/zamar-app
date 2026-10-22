@@ -606,6 +606,9 @@ h2.month::first-letter { text-transform: uppercase; }
 .datebox b { font: 600 1.3rem/1 var(--serif); }
 .datebox small { font-size: 0.7rem; color: var(--muted); text-transform: capitalize; }
 .datebox.muted b { color: var(--muted); }
+.datebox.range { width: auto; min-width: 44px; padding: 4px 6px; }
+.datebox.range b { font-size: 1.05rem; }
+.datebox.range small { font-size: 0.62rem; }
 
 .past { margin-top: 20px; }
 .past summary { cursor: pointer; font-weight: 600; color: var(--muted); }

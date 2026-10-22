@@ -19,7 +19,7 @@ const COMP_EDITABLE = ['Título', 'Autores', 'Estado', 'Tono', 'BPM', 'Letra', '
 // La agenda vive en el mismo archivo privado, en sus propias pestañas (se crean solas).
 const EVENT_HEADERS = [
   'ID', 'Evento', 'Tipo', 'Estatus', 'Fecha', 'Fecha fin', 'Hora', 'Llegada', 'Fin', 'Lugar', 'Dirección',
-  'Contacto', 'Teléfono', 'Setlist', 'Notas', 'Creado', 'Actualizado',
+  'Contacto', 'Teléfono', 'Setlist', 'Notas', 'Ensayo', 'Creado', 'Actualizado',
 ];
 const EVENT_EDITABLE = EVENT_HEADERS.filter((h) => ['ID', 'Creado', 'Actualizado'].indexOf(h) < 0);
 // Se guardan como texto para que la hoja no las convierta en fechas u horas con otra zona horaria.

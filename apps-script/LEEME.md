@@ -56,6 +56,7 @@ estatus, setlist y notas) y quién va a cada uno. Vive en la misma hoja privada 
 en las pestañas *Eventos* y *Asistencia*, que el script crea solo la primera vez que alguien abre la Agenda.
 No hace falta ejecutar nada: basta con pegar el código nuevo y volver a implementar.
 Los eventos de varios días usan la columna *Fecha fin*, que el script agrega sola la primera vez que se guarda uno.
+El programa, la minuta y las tareas de cada ensayo se guardan como texto JSON en la columna *Ensayo*, que también se agrega sola.
 
 ## Si cambias el código
 

@@ -115,6 +115,15 @@ En cada evento cada quien marca **Voy / Tal vez / No puedo** con lo que toca, se
 compartir el resumen por WhatsApp, agregarlo al calendario del teléfono y abrir el lugar en Maps.
 El próximo evento también aparece en la página de inicio (con la última copia guardada).
 
+**Ensayos.** Un evento de tipo *Ensayo* trae tres pestañas:
+- *Antes · Programa:* canciones del repertorio o de un setlist y puntos para platicar, cada uno con sus minutos.
+  Muestra la hora de cada punto, avisa si se pasa del horario y se comparte por WhatsApp. Las tareas sin
+  terminar de ensayos anteriores aparecen ahí.
+- *Durante · Modo ensayo:* un punto a la vez, con cronómetro (vive en el teléfono de quien lo lleva), notas y
+  acceso directo a la canción.
+- *Después · Minuta:* quién vino, lo que se vio, acuerdos y tareas con responsable. Se comparte por WhatsApp.
+Todo se guarda en la columna *Ensayo* de la pestaña Eventos.
+
 ## Publicarla (GitHub Pages, gratis)
 
 En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save**.

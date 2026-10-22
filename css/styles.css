@@ -791,3 +791,61 @@ details.connect[open] > summary { margin-bottom: 8px; }
 details.recadd { margin-top: 10px; }
 details.recadd > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 details.recadd .recorder { margin-top: 8px; }
+
+/* ---------- herramienta de ensayos ---------- */
+.ensayotabs { grid-template-columns: repeat(3, 1fr); margin: 14px 0 4px; border-radius: 18px; }
+.ensayotabs a { display: grid; justify-items: center; padding: 6px 4px; border-radius: 14px; color: inherit; text-decoration: none; opacity: 0.7; }
+.ensayotabs a b { font-size: 0.9rem; }
+.ensayotabs a small { font-size: 0.68rem; }
+.ensayotabs a[aria-selected='true'] { background: var(--accent); color: var(--on-accent); opacity: 1; }
+.ensayocard .row { margin-top: 10px; }
+.ensayocard .button { text-align: center; padding-inline: 6px; }
+.plantotal { position: relative; display: grid; gap: 2px; padding: 12px 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+.plantotal strong { font: 600 1.5rem/1.1 var(--serif); }
+.plantotal span { font-size: 0.85rem; color: var(--muted); }
+.plantotal i { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--ok); }
+.plantotal.over i { background: var(--bad); width: 100% !important; }
+.plantotal.over span { color: var(--bad); }
+.planlist { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.planlist > li { display: grid; grid-template-columns: 44px 1fr 58px; gap: 4px 8px; align-items: start; padding: 10px; border-radius: 14px; background: var(--sunken); }
+.planlist .ptime { font: 600 0.8rem/2.2 var(--mono); color: var(--muted); }
+.planlist .pmain { display: grid; gap: 4px; min-width: 0; }
+.planlist .psong { display: flex; align-items: center; gap: 8px; min-width: 0; line-height: 2.2; }
+.planlist .psong a { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planlist input { width: 100%; min-width: 0; padding: 6px 8px; font-size: 0.9rem; }
+.planlist .ptitle { font-weight: 600; }
+.planlist .pnote { font-size: 0.82rem; }
+.planlist .pmin { display: grid; justify-items: center; gap: 0; }
+.planlist .pmin input { text-align: center; padding: 6px 2px; }
+.planlist .pmin small { font-size: 0.68rem; color: var(--muted); }
+.planlist .pmove { grid-column: 2 / -1; display: flex; justify-content: flex-end; gap: 14px; }
+.planlist .pmove .link { font-size: 1rem; padding: 0 4px; }
+.planlist .pmove .link:disabled { opacity: 0.25; }
+.planlist.compact > li { grid-template-columns: 1fr auto; padding: 8px 10px; align-items: center; }
+.planlist.compact .link { text-align: left; color: inherit; }
+.planlist.compact li.current { outline: 2px solid var(--accent); }
+.planlist.compact li.done .link { opacity: 0.55; }
+.planlist.compact small { font: 0.75rem var(--mono); color: var(--muted); }
+.nowcard { display: grid; gap: 8px; justify-items: stretch; margin-top: 12px; padding: 16px; border-radius: 20px; background: var(--accent); color: var(--on-accent); }
+.nowcard .label, .nowcard .hint { color: var(--on-accent); opacity: 0.75; margin: 0; }
+.nowtitle { font: 600 1.4rem/1.2 var(--serif); }
+.nowclock { font: 700 3.4rem/1 var(--mono); text-align: center; letter-spacing: -0.02em; }
+.nowcard.over .nowclock { color: var(--bad); }
+.nowcard .row { gap: 8px; }
+.nowcard .row button { flex: 1; background: var(--on-accent); color: var(--accent); border: 0; font-weight: 600; }
+.nowcard .row button.primary { background: var(--ok); color: #fff; }
+.nowcard .key { font-size: 0.8rem; vertical-align: middle; }
+.nowcard .button.ghost { color: var(--on-accent); border-color: color-mix(in srgb, var(--on-accent) 40%, transparent); text-align: center; }
+.nowcard .field span { color: var(--on-accent); opacity: 0.75; }
+.nowcard textarea { color: var(--text); font: inherit; font-size: 0.92rem; }
+.tasks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.tasks li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 10px; border-radius: 12px; background: var(--sunken); }
+.tasks li label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.tasks li small { color: var(--muted); font-size: 0.78rem; }
+.tasks input:checked + span { text-decoration: line-through; opacity: 0.6; }
+.ensayo section .row { margin-top: 8px; }
+.ensayo section .row:has(> input, > select) { grid-template-columns: minmax(0, 1fr) auto; }
+.ensayo section .row.taskadd { grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) auto; }
+.ensayo section .row input, .ensayo section .row select { min-width: 0; width: 100%; }
+.ensayo section .row > button { padding-inline: 14px; }
+.ensayo .button { text-align: center; }

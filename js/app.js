@@ -1146,6 +1146,7 @@ function route() {
     if (h === '#/agenda') return agenda.renderList;
     if (h === '#/agenda/nuevo') return () => agenda.renderEdit('');
     if ((m = h.match(/^#\/agenda\/([^/]+)\/editar$/))) return () => agenda.renderEdit(decodeURIComponent(m[1]));
+    if ((m = h.match(/^#\/agenda\/([^/]+)\/ensayo(?:\/([a-z]+))?$/))) return () => agenda.renderEnsayo(decodeURIComponent(m[1]), m[2] || '');
     if ((m = h.match(/^#\/agenda\/([^/]+)$/))) return () => agenda.renderOne(decodeURIComponent(m[1]));
   }
   if ((m = h.match(/^#\/c\/([^?]+)(?:\?(.*))?$/))) {

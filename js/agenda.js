@@ -6,6 +6,7 @@ import { setupApi } from './api.js';
 import { normalize } from './songs.js';
 import { keyName } from './music.js';
 import { allSetlists, encodeSetlist } from './setlists.js';
+import { setupEnsayo, parsePlan, hasPlan, planMinutes } from './ensayo.js';
 
 export const STATUSES = ['Invitación recibida', 'Pendiente de detalles', 'Confirmado', 'Realizado', 'Cancelado'];
 export const TYPES = ['Misa', 'Hora santa', 'Retiro', 'Congreso', 'Concierto', 'Boda', 'XV años', 'Evangelización', 'Ensayo', 'Otro'];
@@ -103,6 +104,7 @@ export function toEvent(r) {
     phone: String(r['Teléfono'] || ''),
     setlist: String(r.Setlist || ''),
     notes: String(r.Notas || ''),
+    plan: r.Ensayo ? parsePlan(r.Ensayo) : null,
   };
 }
 
@@ -232,6 +234,7 @@ export function setupAgenda(ctx) {
     const back = (e) => ({
       ID: e.id, Evento: e.title, Tipo: e.type, Estatus: e.status, Fecha: e.day, 'Fecha fin': e.endDay, Hora: e.time, Llegada: e.arrive, Fin: e.end,
       Lugar: e.place, 'Dirección': e.address, Contacto: e.contact, 'Teléfono': e.phone, Setlist: e.setlist, Notas: e.notes,
+      Ensayo: e.plan ? JSON.stringify(e.plan) : '',
     });
     store.set(CACHE, { events: data.events.map(back), rsvps: data.rsvps, at: new Date().toISOString() });
   }
@@ -485,6 +488,25 @@ export function setupAgenda(ctx) {
     </section>`;
   }
 
+  function ensayoSection(e) {
+    const p = e.plan;
+    const base = `#/agenda/${encodeURIComponent(e.id)}/ensayo`;
+    const open = p ? p.tasks.filter((t) => !t.done).length : 0;
+    return `<section class="card ensayocard">
+      <h2>Ensayo</h2>
+      <p class="hint">${
+        hasPlan(p)
+          ? esc([`${p.items.length} puntos · ${planMinutes(p)} min`, p.agreements.length && `${p.agreements.length} acuerdos`, open && `${open} tareas pendientes`].filter(Boolean).join(' · '))
+          : 'Arma el programa con las canciones y los puntos a platicar, llévalo con cronómetro durante el ensayo y cierra con la minuta.'
+      }</p>
+      <div class="row three even">
+        <a class="button" href="${base}/programa">Programa</a>
+        <a class="button" href="${base}/durante">Modo ensayo</a>
+        <a class="button" href="${base}/minuta">Minuta</a>
+      </div>
+    </section>`;
+  }
+
   function shareText(e) {
     const names = going(e.id).map((r) => r['Quién']);
     return [
@@ -549,6 +571,7 @@ export function setupAgenda(ctx) {
               : ''
           }
 
+          ${e.type === 'Ensayo' ? ensayoSection(e) : ''}
           ${attendance(e)}
           ${setlistSection(e)}
           ${e.notes ? `<section><h2>Notas</h2><p class="teamnotes">${esc(e.notes)}</p></section>` : ''}
@@ -715,7 +738,7 @@ export function setupAgenda(ctx) {
         msg('Guardando…');
         try {
           const res = await api('saveEvent', { id: e?.id || '', fields });
-          const updated = toEvent({ ID: res.id, ...fields, Setlist: e?.setlist || '' });
+          const updated = toEvent({ ID: res.id, ...fields, Setlist: e?.setlist || '', Ensayo: e?.plan || '' });
           if (e) Object.assign(e, updated);
           else data.events.push(updated);
           saveCache();
@@ -754,5 +777,10 @@ export function setupAgenda(ctx) {
     </a>`;
   }
 
-  return { renderList, renderOne, renderEdit, nextBanner };
+  const ensayo = setupEnsayo({
+    app, store, esc, backHeader, api, ensure, byId, saveCache, people, going, songs, who, dateRange, today,
+    events: () => data.events || [],
+  });
+
+  return { renderList, renderOne, renderEdit, nextBanner, renderEnsayo: ensayo.render };
 }

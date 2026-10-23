@@ -1,7 +1,7 @@
 import { sheetCsvUrl, LYRICS_GID } from './config.js';
 import { parseCsv, rowsToSongs, rowsToTexts, attachTexts, suggestions, normalize } from './songs.js';
 import { keyName, transposeKey, useFlats, semitonesBetween, parseKey, keyRelation } from './music.js';
-import { renderChordSheet, lyricsFromChords, tabsFromChords, renderLyrics, sheetKey } from './chordpro.js';
+import { renderChordSheet, chordSheetLines, lyricsFromChords, tabsFromChords, renderLyrics, sheetKey } from './chordpro.js';
 import {
   allSetlists,
   getSetlist,
@@ -25,7 +25,7 @@ import { setupAgenda } from './agenda.js';
 import { setupRehearsals } from './rehearsals.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
 import { playProgression, stopPlaying } from './progressions.js';
-import { setlistImage, setlistPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
+import { setlistImage, setlistPdf, chordsPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
 const CACHE_KEY = 'zamar:repertorio';
 const app = document.getElementById('app');
@@ -470,7 +470,9 @@ function renderSong(id, ctx = null, came = null) {
       ? `<div class="sheet lyrics">${renderLyrics(lyrics)}</div>`
       : '<p class="hint">Aún no hay letra cargada para esta canción.</p>',
     acordes: song.chords
-      ? `<div class="sheet">${renderChordSheet(song.chords, chordShift, flats)}</div>`
+      ? `<div class="sheet">${renderChordSheet(song.chords, chordShift, flats)}</div>
+         <div class="row sheettools"><button data-action="chordspdf">📄 PDF de acordes${key ? ` en ${esc(keyName(key))}` : ''}</button></div>
+         <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
     tabs: `<pre class="sheet">${esc(tabs)}</pre>`,
   };
@@ -664,6 +666,21 @@ function renderSong(id, ctx = null, came = null) {
       rerender();
     }),
   );
+  app.querySelector('[data-action="chordspdf"]')?.addEventListener('click', async (ev) => {
+    const b = ev.currentTarget;
+    const out = document.getElementById('pdfmsg');
+    const keyText = key ? keyName(key) : '';
+    b.disabled = true;
+    out.textContent = 'Preparando el PDF…';
+    try {
+      const blob = await chordsPdf(song, keyText, chordSheetLines(song.chords, chordShift, flats));
+      const how = await shareFile(blob, { name: `${song.title} acordes ${keyText}` }, 'pdf', 'application/pdf');
+      out.textContent = how === 'downloaded' ? 'PDF descargado.' : '';
+    } catch (err) {
+      out.textContent = err.message || 'No se pudo crear el PDF.';
+    }
+    b.disabled = false;
+  });
   app.querySelector('[data-action="addset"]')?.addEventListener('click', () => {
     let setId = app.querySelector('#setsel').value;
     if (setId === 'new') {

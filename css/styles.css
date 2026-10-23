@@ -858,3 +858,5 @@ details.recadd .recorder { margin-top: 8px; }
 .songhits { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; grid-auto-rows: max-content; -webkit-overflow-scrolling: touch; }
 .songhits > li { flex: none; }
 [hidden] { display: none !important; }
+.sheettools { display: block; margin-top: 12px; }
+.sheettools button { width: 100%; }

@@ -38,9 +38,11 @@ export function metadata(text) {
 }
 
 function transposeInline(line, shift, flats) {
-  return line.replace(/\[([^\]]+)\]/g, (all, inner) =>
-    isChord(inner.trim()) ? `[${transposeChord(inner.trim(), shift, flats)}]` : all,
-  );
+  return line.replace(/\[([^\]]+)\]/g, (all, inner) => {
+    // [*Bb/A] es un acorde marcado como anotación en Songbook Pro: también se transpone.
+    const name = inner.trim().replace(/^\*/, '');
+    return isChord(name) ? `[${transposeChord(name, shift, flats)}]` : all;
+  });
 }
 
 /** Dibuja la hoja de acordes como HTML, transpuesta `shift` semitonos. */
@@ -99,6 +101,59 @@ export function renderChordSheet(text, shift = 0, flats = false) {
   if (inSection) out.push('</div>');
   // Los bloques ya cierran su propia línea; no agregar saltos alrededor de ellos.
   return out.join('\n').replace(/\n?(<div class="block[^"]*">)\n?/g, '$1').replace(/\n?<\/div>\n?/g, '</div>');
+}
+
+/**
+ * La hoja de acordes como renglones de texto para imprimir (PDF), transpuesta `shift`
+ * semitonos. Los acordes en línea ([G]pala[D]bra) se pasan a un renglón de acordes encima
+ * de la letra, alineados por columna. Devuelve [{ type: 'section'|'chords'|'lyric'|'tab'|'blank', text }],
+ * y en los pares de acordes con letra, `pair` une ambos renglones para no separarlos.
+ */
+export function chordSheetLines(text, shift = 0, flats = false) {
+  const out = [];
+  let inTab = false;
+  for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
+    const d = raw.match(DIRECTIVE);
+    if (d) {
+      const name = d[1].toLowerCase();
+      if (SECTION_START[name]) {
+        inTab = isTabStart(name);
+        out.push({ type: 'section', text: d[2] || SECTION_START[name] });
+      } else if (SECTION_END.has(name)) {
+        inTab = false;
+        out.push({ type: 'blank', text: '' });
+      } else if (COMMENT.has(name) && d[2]) {
+        out.push({ type: 'section', text: d[2] });
+      }
+      continue;
+    }
+    if (inTab) out.push({ type: 'tab', text: raw.trimEnd() });
+    else if (/\[[^\]]+\]/.test(raw)) {
+      let chords = '';
+      let lyric = '';
+      const parts = transposeInline(raw, shift, flats).split(/\[([^\]]+)\]/);
+      for (let n = 0; n < parts.length; n++) {
+        if (n % 2 === 0) {
+          lyric += parts[n];
+          continue;
+        }
+        // Si el acorde anterior todavía no termina, se recorre la letra: con guiones si es a
+        // media palabra (Se--ñor), con espacios si no.
+        if (chords.length > lyric.length) {
+          const midWord = /\S$/.test(lyric) && /^\S/.test(parts[n + 1] || '');
+          lyric = lyric.padEnd(chords.length, midWord ? '-' : ' ');
+        }
+        chords = chords.padEnd(lyric.length) + parts[n] + ' ';
+      }
+      out.push({ type: 'chords', text: chords.trimEnd(), pair: true }, { type: 'lyric', text: lyric.trimEnd() });
+    } else if (isChordLine(raw)) out.push({ type: 'chords', text: transposeChordLine(raw, shift, flats).trimEnd() });
+    else if (!raw.trim()) out.push({ type: 'blank', text: '' });
+    else out.push({ type: 'lyric', text: raw.trimEnd() });
+  }
+  // Sin renglones vacíos repetidos ni al principio o al final.
+  return out
+    .filter((l, i, all) => l.type !== 'blank' || (i > 0 && all[i - 1].type !== 'blank'))
+    .filter((l, i, all) => l.type !== 'blank' || (i > 0 && i < all.length - 1));
 }
 
 /** Solo la letra: quita acordes, directivas y tabs. Sirve cuando no hay letra cargada aparte. */

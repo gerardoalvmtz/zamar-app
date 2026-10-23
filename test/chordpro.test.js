@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderChordSheet, lyricsFromChords, tabsFromChords, sheetKey, metadata } from '../js/chordpro.js';
+import { renderChordSheet, lyricsFromChords, tabsFromChords, sheetKey, metadata, chordSheetLines } from '../js/chordpro.js';
 
 const CHO = `{title: Canción de prueba}
 {artist: Zamar}
@@ -42,4 +42,24 @@ test('saca la letra limpia de una hoja de acordes', () => {
 
 test('extrae los tabs', () => {
   assert.equal(tabsFromChords(CHO), 'Riff\ne|---3---2---|\nB|---------3-|');
+});
+
+test('renglones para el PDF: acordes encima de la letra, transpuestos', () => {
+  const lines = chordSheetLines('{title: X}\n{soc}\n[G]Santo, [D]santo es el [Em]Se[C]ñor\n{eoc}\n\nG  D', 2);
+  assert.deepEqual(
+    lines.map((l) => [l.type, l.text]),
+    [
+      ['section', 'Coro'],
+      ['chords', 'A      E           F#m D'],
+      ['lyric', 'Santo, santo es el Se--ñor'],
+      ['blank', ''],
+      ['chords', 'A  E'],
+    ],
+  );
+  assert.equal(lines[1].pair, true);
+});
+
+test('los acordes marcados con * (Songbook Pro) también se transponen', () => {
+  const lines = chordSheetLines('sea si[Bb]empr[*Bb/A]e lo pr[Gm]imero', 1);
+  assert.equal(lines[0].text, '      B   B/A#   G#m');
 });

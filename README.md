@@ -51,6 +51,8 @@ transponen al cambiar el tono.
   sección (Canciones, Setlists, Agenda y Composiciones). El repertorio está en `#/canciones`.
 - Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
+- Exportar la hoja de acordes de una canción a PDF en el tono elegido (botón debajo de los acordes): acordes en
+  negritas encima de la letra, alineados, y en una sola hoja cuando cabe.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
   el BPM y el tema.
 - Notas personales que se guardan solo en el teléfono de cada quien.

@@ -426,6 +426,124 @@ export async function setlistPdf(set, rows, { audience = false } = {}) {
   return doc.output('blob');
 }
 
+/**
+ * PDF con la hoja de acordes de una canción en el tono elegido. `lines` sale de
+ * chordSheetLines(); los acordes y su letra van en letra monoespaciada para que no se
+ * desalineen, y nunca se separan entre páginas.
+ */
+export async function chordsPdf(song, key, lines) {
+  const JsPDF = await loadJsPdf();
+  const doc = new JsPDF({ unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 54;
+  const longest = Math.max(0, ...lines.map((l) => plain(l.text).length));
+  const charW = (size) => doc.setFont('courier', 'normal').setFontSize(size).getTextWidth('M');
+
+  // Acomoda la hoja con letra de `size` puntos. Con draw = false solo cuenta las páginas.
+  const layout = (size, draw) => {
+    const lineH = size * 1.32;
+    const cols = Math.floor((W - M * 2) / charW(size));
+    let pages = 1;
+    let y = M;
+    const ensure = (h) => {
+      if (y + h > H - M) {
+        pages++;
+        if (draw) doc.addPage();
+        y = M;
+      }
+    };
+    const text = (t, x, font, style, pt) => draw && doc.setFont(font, style).setFontSize(pt).text(t, x, y);
+
+    y += 10;
+    text(plain(song.title), M, 'times', 'bold', 24);
+    y += 22;
+    if (draw) doc.setTextColor(110);
+    text(plain([song.author, key && `Tono ${key}`, song.bpm && `${song.bpm} BPM`].filter(Boolean).join(' · ')), M, 'helvetica', 'normal', 12);
+    if (draw) doc.setTextColor(0);
+    y += 28;
+
+    const write = (t, bold) => {
+      text(t, M, 'courier', bold ? 'bold' : 'normal', size);
+      y += lineH;
+    };
+    // Parte un renglón largo en pedazos de `cols` columnas, cortando en un espacio si se puede.
+    const cuts = (t) => {
+      const out = [];
+      let from = 0;
+      while (t.length - from > cols) {
+        let end = t.lastIndexOf(' ', from + cols);
+        if (end <= from) end = from + cols;
+        out.push(end);
+        from = end;
+      }
+      return out;
+    };
+    const slices = (t, at) => [0, ...at].map((a, i) => t.slice(a, at[i] ?? t.length).trimEnd());
+
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const t = plain(l.text);
+      if (l.type === 'blank') {
+        y += lineH * 0.6;
+        continue;
+      }
+      if (l.type === 'section') {
+        y += 4;
+        ensure(lineH * 3);
+        if (draw) doc.setTextColor(110);
+        text(t.toUpperCase(), M, 'helvetica', 'bold', size);
+        if (draw) doc.setTextColor(0);
+        y += lineH + 2;
+        continue;
+      }
+      if (l.pair && lines[i + 1]) {
+        // Acordes con su letra: se cortan en las mismas columnas para que sigan alineados, y
+        // un renglón solo de acordes (intro, interludio) no deja un renglón vacío debajo.
+        const lyric = plain(lines[i + 1].text);
+        const at = cuts(lyric.length >= t.length ? lyric : t);
+        const bottom = slices(lyric, at);
+        const empty = !lyric.trim();
+        slices(t, at).forEach((top, k) => {
+          ensure(lineH * (empty ? 1 : 2));
+          write(top, true);
+          if (!empty) write(bottom[k], false);
+        });
+        i++;
+        continue;
+      }
+      for (const part of slices(t, cuts(t))) {
+        ensure(lineH);
+        write(part, l.type === 'chords');
+      }
+    }
+    return pages;
+  };
+
+  // Letra de 11 pt, más chica (hasta 8) si el renglón más largo no cabe a lo ancho, y un poco
+  // más chica (hasta 9) si así la canción cabe en una sola hoja.
+  let size = 11;
+  while (size > 8 && charW(size) * longest > W - M * 2) size -= 0.5;
+  for (let s = size; s >= 9; s -= 0.5) {
+    if (layout(s, false) === 1) {
+      size = s;
+      break;
+    }
+  }
+  layout(size, true);
+
+  const pages = doc.getNumberOfPages();
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(140);
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.text(plain(`${song.title}${key ? ` · ${key}` : ''} · Zamar Adoración`), M, H - 28);
+    if (pages > 1) doc.text(`${p} / ${pages}`, W - M, H - 28, { align: 'right' });
+  }
+  return doc.output('blob');
+}
+
 let qrReady = null;
 function loadQr() {
   qrReady ||= new Promise((resolve, reject) => {

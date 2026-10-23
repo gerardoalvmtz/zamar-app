@@ -127,6 +127,13 @@ export function setupEnsayo(deps) {
 
   // ---------- guardar ----------
   const pending = {};
+  // Link a una canción del programa dentro del ensayo, con Anterior/Siguiente entre las canciones.
+  function songHref(e, item) {
+    const songsInPlan = e.plan.items.filter((i) => i.kind === 'song' && findSong(i.songId));
+    const n = songsInPlan.indexOf(item);
+    return n < 0 ? `#/c/${encodeURIComponent(item.songId)}` : `#/agenda/${encodeURIComponent(e.id)}/ensayo/cancion/${n}`;
+  }
+
   function persist(e, msgEl) {
     saveCache();
     const show = (t) => {
@@ -197,7 +204,7 @@ export function setupEnsayo(deps) {
                     <span class="pmain">
                       ${
                         i.kind === 'song'
-                          ? `<span class="psong"><a href="#/c/${encodeURIComponent(i.songId)}">🎵 ${esc(i.title)}</a>${i.key ? `<span class="key">${esc(i.key)}</span>` : ''}</span>`
+                          ? `<span class="psong"><a href="${songHref(e, i)}">🎵 ${esc(i.title)}</a>${i.key ? `<span class="key">${esc(i.key)}</span>` : ''}</span>`
                           : `<input class="ptitle" data-field="title" value="${esc(i.title)}" aria-label="Punto">`
                       }
                       <input class="pnote" data-field="notes" value="${esc(i.notes || '')}" placeholder="${i.kind === 'song' ? 'Qué repasar: entrada, final, armonías…' : 'Detalles'}" aria-label="Detalle">
@@ -276,7 +283,7 @@ export function setupEnsayo(deps) {
           <button type="button" class="primary" data-action="toggle">${t.running && t.current === cur.id ? '⏸ Pausa' : '▶ Iniciar'}</button>
           <button type="button" data-action="done">${cur.done ? '↺ Desmarcar' : '✓ Listo, siguiente'}</button>
         </div>
-        ${song ? `<a class="button ghost" href="#/c/${encodeURIComponent(song.id)}">Abrir canción · acordes, Spotify y grabaciones</a>` : ''}
+        ${song ? `<a class="button ghost" href="${songHref(e, cur)}">Abrir canción · acordes, Spotify y grabaciones</a>` : ''}
         <label class="field"><span>Notas de este punto</span><textarea rows="2" data-curnote placeholder="Lo que acordamos aquí, lo que falta pulir…">${esc(cur.notes || '')}</textarea></label>
       </section>
       <p class="hint" data-overall>Llevan ${clock(totalSpent)} de ${planMinutes(plan)}:00 · ${done} de ${plan.items.length} cubiertos</p>
@@ -611,5 +618,23 @@ export function setupEnsayo(deps) {
     }
   }
 
-  return { render };
+  /** Las canciones del programa como un setlist, para abrirlas una tras otra desde el ensayo. */
+  function withSongs(id, then) {
+    ensure(() => {
+      const e = byId(id);
+      const items = (e?.plan?.items || []).filter((i) => i.kind === 'song' && findSong(i.songId));
+      const set = e ? { id: `ensayo-${e.id}`, name: e.title, items: items.map((i) => ({ id: i.songId, key: i.key || '', item: i.id })) } : null;
+      // Cambiar el tono desde la canción lo cambia en el programa del ensayo.
+      const save = (s) => {
+        s.items.forEach((x) => {
+          const item = e.plan.items.find((i) => i.id === x.item);
+          if (item) item.key = x.key;
+        });
+        persist(e);
+      };
+      then(set, save);
+    });
+  }
+
+  return { render, withSongs };
 }

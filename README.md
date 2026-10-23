@@ -51,6 +51,7 @@ transponen al cambiar el tono.
   sección (Canciones, Setlists, Agenda y Composiciones). El repertorio está en `#/canciones`.
 - Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
+- Cambiar el tamaño de la letra en Letra y Acordes (A− / A+); se recuerda en cada teléfono.
 - Exportar la hoja de acordes de una canción a PDF en el tono elegido (botón debajo de los acordes): acordes en
   negritas encima de la letra, alineados, y en una sola hoja cuando cabe.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
@@ -90,7 +91,9 @@ Con la edición activa aparece la pestaña **Composiciones**, que pide el PIN. A
 nuevas por etapa (Idea, En proceso, Terminada): título, autores, tono, BPM, letra, acordes, notas y los audios
 de referencia de cada momento, que se graban desde el teléfono o se suben como archivo (hasta 25 MB).
 Cuando una está *Terminada*, el botón **Pasar al repertorio** la agrega a la lista de canciones con su letra
-y acordes. Cada composición tiene **Comentarios del equipo**, y cada audio su propio hilo para opinar sobre
+y acordes. **📷 Transcribir foto** (junto a Letra, al editar) lee una foto de la hoja escrita a mano o
+impresa y agrega el texto a la letra para revisarlo (necesita activar Drive API una vez, ver el LEEME del
+script). Cada composición tiene **Comentarios del equipo**, y cada audio su propio hilo para opinar sobre
 esa toma; cada comentario lleva quién lo escribió y la fecha. Los datos viven en una hoja privada aparte, no en el Sheets público (ver [`apps-script/LEEME.md`](apps-script/LEEME.md)).
 
 **💡 Ideas de progresiones** (`#/comp/ideas`, y plegado en cada composición y en el editor): eliges un ánimo
@@ -124,7 +127,8 @@ se ajusta por separado. Trae tres pestañas:
   Muestra la hora de cada punto (en formato de 12 horas), avisa si se pasa del horario y se comparte por WhatsApp como texto o como imagen PNG. Las tareas sin
   terminar de ensayos anteriores aparecen ahí.
 - *Durante · Modo ensayo:* un punto a la vez, con cronómetro (vive en el teléfono de quien lo lleva), notas y
-  acceso directo a la canción.
+  acceso a la canción. Desde ahí, Anterior/Siguiente recorre las canciones del programa como un setlist, el
+  tono que se cambie queda en el programa y "Volver al ensayo" regresa al modo ensayo.
 - *Después · Minuta:* quién vino, lo que se vio, acuerdos y tareas con responsable. Se comparte por WhatsApp.
 Todo se guarda en la columna *Ensayo* de la pestaña Eventos.
 

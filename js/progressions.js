@@ -203,17 +203,68 @@ export function voicing(c) {
 }
 
 /**
+ * En el iPhone el sonido de la web se apaga con el interruptor de silencio, aunque el
+ * volumen esté arriba. Pidiendo la sesión de audio de "reproducción" suena como un video.
+ * En iOS más viejos (sin navigator.audioSession) se logra tocando un audio mudo a la vez.
+ */
+let unmuted = false;
+let silent = null;
+function unmuteIos() {
+  if (silent) return silent.play().catch(() => {});
+  if (unmuted) return;
+  unmuted = true;
+  try {
+    if (navigator.audioSession) {
+      navigator.audioSession.type = 'playback';
+      return;
+    }
+  } catch {
+    // sigue con el audio mudo
+  }
+  if (!/iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))) return;
+  silent = new Audio(SILENCE);
+  silent.loop = true;
+  silent.setAttribute('playsinline', '');
+  silent.play().catch(() => {});
+}
+// Medio segundo de silencio en WAV (8 kHz, 8 bits).
+const SILENCE = (() => {
+  const n = 4000;
+  const bytes = new Uint8Array(44 + n);
+  const v = new DataView(bytes.buffer);
+  const str = (o, t) => [...t].forEach((c, i) => (bytes[o + i] = c.charCodeAt(0)));
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n, true);
+  str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true);
+  v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  str(36, 'data');
+  v.setUint32(40, n, true);
+  bytes.fill(128, 44);
+  let bin = '';
+  bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return `data:audio/wav;base64,${btoa(bin)}`;
+})();
+
+/**
  * Toca la progresión en piano, un acorde por compás de 4 tiempos.
  * Devuelve cuántos segundos dura (0 si el teléfono no puede tocar audio).
  */
 export async function playProgression(chords, bpm = 80) {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return 0;
-  audio ||= new AC();
-  const ctx = audio;
-  if (ctx.state === 'suspended') ctx.resume();
+  // Todo lo que pide permiso para sonar va antes del primer await, todavía dentro del toque.
   stopPlaying();
   const id = ++playId;
+  unmuteIos();
+  audio ||= new AC();
+  const ctx = audio;
+  if (ctx.state !== 'running') await ctx.resume().catch(() => {});
   const all = chords.map(voicing);
   const needed = [...new Set(all.flat().map(nearest))];
   const loaded = Object.fromEntries(await Promise.all(needed.map(async (m) => [m, await sample(m)])));
@@ -243,11 +294,14 @@ export async function playProgression(chords, bpm = 80) {
       src.stop(end + 0.4);
     });
   });
-  return chords.length * bar + 1.5;
+  const secs = chords.length * bar + 1.5;
+  setTimeout(() => id === playId && silent?.pause(), (secs + 1) * 1000);
+  return secs;
 }
 
 export function stopPlaying() {
   playId++;
+  silent?.pause();
   if (!current) return;
   current.disconnect();
   current = null;

@@ -49,6 +49,18 @@ Después de pegar el código nuevo, en el editor elige la función **prepararCom
 arriba y toca **▶ Ejecutar**. Google pide permisos otra vez (ahora también para crear la hoja); acéptalos.
 Luego vuelve a implementar como se explica abajo.
 
+### Transcribir la foto de una hoja
+
+En el editor de una composición, **📷 Transcribir foto** manda la foto al script (acción `transcribe`, con
+PIN). El script la convierte en un documento temporal de Google Docs con el reconocimiento de texto de Drive
+(español), copia el texto y borra el documento. Para que funcione hay que activarlo una vez:
+
+1. En el editor de Apps Script, a la izquierda, en **Servicios** toca **+**, elige **Drive API** y toca
+   **Agregar** (deja la versión que sugiere, v3).
+2. Arriba elige la función **prepararTranscripcion** y toca **▶ Ejecutar**. Google pide permiso para Drive y
+   Docs; acéptalo.
+3. Vuelve a implementar como **Nueva versión** (abajo).
+
 ## Agenda (privada)
 
 La sección **Agenda** guarda los eventos a los que invitan al ministerio (fecha, horas, lugar, contacto,

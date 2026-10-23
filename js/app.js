@@ -412,14 +412,25 @@ function renderKeepingSpotify(html) {
 }
 
 /**
- * ctx: { set, index } cuando la canción se abre desde un setlist; entonces el tono
- * viene del setlist y los botones de tono lo cambian ahí.
+ * ctx: { set, index } cuando la canción se abre desde un setlist (o desde el modo ensayo, que
+ * arma un setlist con las canciones del programa); entonces el tono viene de ahí y los botones
+ * de tono lo cambian ahí. href(i) es el link de la canción i, back el regreso, save() guarda.
  */
+const setCtx = (set, index) => ({
+  set,
+  index,
+  href: (i) => `#/set/${set.id}/${i}`,
+  back: { href: `#/set/${set.id}`, label: set.name },
+  keyLabel: 'Tono del setlist',
+  save: () => saveSetlist(set),
+  reload: () => setCtx(getSetlist(set.id) || set, index),
+});
+
 function renderSong(id, ctx = null, came = null) {
   const song = songById(id);
   const fromSong = came ? songById(came.id) : null;
   const back = ctx
-    ? backHeader(`#/set/${ctx.set.id}`, ctx.set.name)
+    ? backHeader(ctx.back.href, ctx.back.label)
     : fromSong
       ? backHeader(`#/c/${encodeURIComponent(fromSong.id)}`, fromSong.title)
       : backHeader('#/canciones', 'Repertorio');
@@ -506,7 +517,7 @@ function renderSong(id, ctx = null, came = null) {
   const nextUp = nextItem
     ? `<section class="nextup">
         <h2>Para llegar a la siguiente</h2>
-        <a class="nextsong" href="#/set/${ctx.set.id}/${ctx.index + 1}">
+        <a class="nextsong" href="${ctx.href(ctx.index + 1)}">
           <span class="song-title">${esc(nextSong ? nextSong.title : 'Canción no encontrada')}</span>
           <span class="song-meta">${nextKey ? `<span class="key">${esc(keyName(nextKey))}</span>` : ''}${nextSong?.bpm ? `<span class="bpm">${nextSong.bpm}</span>` : ''}</span>
         </a>
@@ -516,9 +527,9 @@ function renderSong(id, ctx = null, came = null) {
 
   const nav = ctx
     ? `<div class="setnav">
-        ${ctx.index > 0 ? `<a class="button ghost" href="#/set/${ctx.set.id}/${ctx.index - 1}">‹ Anterior</a>` : '<span></span>'}
+        ${ctx.index > 0 ? `<a class="button ghost" href="${ctx.href(ctx.index - 1)}">‹ Anterior</a>` : '<span></span>'}
         <span class="hint">${ctx.index + 1} de ${ctx.set.items.length}</span>
-        ${ctx.index < ctx.set.items.length - 1 ? `<a class="button ghost" href="#/set/${ctx.set.id}/${ctx.index + 1}">Siguiente ›</a>` : '<span></span>'}
+        ${ctx.index < ctx.set.items.length - 1 ? `<a class="button ghost" href="${ctx.href(ctx.index + 1)}">Siguiente ›</a>` : '<span></span>'}
       </div>`
     : '';
 
@@ -541,7 +552,7 @@ function renderSong(id, ctx = null, came = null) {
         ${
           key
             ? `<div class="keynow">
-                 <span class="label">${ctx ? 'Tono del setlist' : hasBoth ? 'Tono' : baseChoice === 'zamar' ? 'Tono Zamar' : 'Tono original'}</span>
+                 <span class="label">${ctx ? ctx.keyLabel : hasBoth ? 'Tono' : baseChoice === 'zamar' ? 'Tono Zamar' : 'Tono original'}</span>
                  <span class="big">${esc(keyName(key))}</span>
                  ${!ctx && shift ? `<span class="orig">${baseChoice === 'zamar' ? 'Zamar' : 'original'}: ${esc(keyName(baseKey))}</span>` : ''}
                  ${ctx && baseKey && baseKey.pc !== key.pc ? `<span class="orig">Zamar: ${esc(keyName(baseKey))}</span>` : ''}
@@ -576,6 +587,7 @@ function renderSong(id, ctx = null, came = null) {
             .map((v) => `<button role="tab" data-view="${v}" aria-selected="${view === v}">${{ letra: 'Letra', acordes: 'Acordes', tabs: 'Tabs' }[v]}</button>`)
             .join('')}
         </div>
+        ${view !== 'tabs' ? fontSizeControl() : ''}
         ${viewBody[view]}
       </section>
 
@@ -638,13 +650,13 @@ function renderSong(id, ctx = null, came = null) {
     </article>
     ${nav}`);
 
-  const rerender = () => renderSong(song.id, ctx && { set: getSetlist(ctx.set.id) || ctx.set, index: ctx.index }, came);
+  const rerender = () => renderSong(song.id, ctx && ctx.reload(), came);
   hydrateSpotify();
   rehearsals?.wire(song);
   const moveKey = (d) => {
     if (ctx) {
       ctx.set.items[ctx.index].key = keyName(transposeKey(key, d));
-      saveSetlist(ctx.set);
+      ctx.save();
     } else {
       let v = (((shift + d) % 12) + 12) % 12;
       if (v > 6) v -= 12;
@@ -660,6 +672,7 @@ function renderSong(id, ctx = null, came = null) {
       rerender();
     }),
   );
+  wireFontSize();
   app.querySelectorAll('[data-view]').forEach((b) =>
     b.addEventListener('click', () => {
       store.set('zamar:view', b.dataset.view);
@@ -699,6 +712,35 @@ function renderSong(id, ctx = null, came = null) {
       document.getElementById('saved').textContent = 'Guardado en este teléfono';
     }, 400);
   });
+}
+
+// ---------- tamaño de letra en letras y acordes (se recuerda en cada teléfono) ----------
+const FONT_STEPS = [0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
+const fontStep = () => Math.min(Math.max(Number(store.get('zamar:fontsize', 2)) || 0, 0), FONT_STEPS.length - 1);
+const applyFontSize = () => document.documentElement.style.setProperty('--fs', FONT_STEPS[fontStep()]);
+applyFontSize();
+
+function fontSizeControl() {
+  const n = fontStep();
+  return `<div class="fontsize" aria-label="Tamaño de letra">
+    <button class="ghost" data-font="-1" aria-label="Letra más chica" ${n === 0 ? 'disabled' : ''}>A−</button>
+    <span id="fontpct">${Math.round(FONT_STEPS[n] * 100)}%</span>
+    <button class="ghost" data-font="1" aria-label="Letra más grande" ${n === FONT_STEPS.length - 1 ? 'disabled' : ''}>A+</button>
+  </div>`;
+}
+
+// Cambia el tamaño sin volver a dibujar la página, para no perder por dónde vas.
+function wireFontSize() {
+  app.querySelectorAll('[data-font]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const n = Math.min(Math.max(fontStep() + Number(b.dataset.font), 0), FONT_STEPS.length - 1);
+      store.set('zamar:fontsize', n);
+      applyFontSize();
+      app.querySelector('#fontpct').textContent = `${Math.round(FONT_STEPS[n] * 100)}%`;
+      app.querySelector('[data-font="-1"]').disabled = n === 0;
+      app.querySelector('[data-font="1"]').disabled = n === FONT_STEPS.length - 1;
+    }),
+  );
 }
 
 // ---------- setlists ----------
@@ -1163,6 +1205,22 @@ function route() {
     if (h === '#/agenda') return agenda.renderList;
     if (h === '#/agenda/nuevo') return () => agenda.renderEdit('');
     if ((m = h.match(/^#\/agenda\/([^/]+)\/editar$/))) return () => agenda.renderEdit(decodeURIComponent(m[1]));
+    if ((m = h.match(/^#\/agenda\/([^/]+)\/ensayo\/cancion\/(\d+)$/))) {
+      const [eid, index] = [decodeURIComponent(m[1]), Number(m[2])];
+      return () => agenda.withRehearsalSongs(eid, (set, save) => {
+        if (!set?.items[index]) return agenda.renderEnsayo(eid, 'durante');
+        const ctx = (s) => ({
+          set: s,
+          index,
+          href: (i) => `#/agenda/${encodeURIComponent(eid)}/ensayo/cancion/${i}`,
+          back: { href: `#/agenda/${encodeURIComponent(eid)}/ensayo/durante`, label: 'Volver al ensayo' },
+          keyLabel: 'Tono del ensayo',
+          save: () => save(s),
+          reload: () => ctx(s),
+        });
+        renderSong(set.items[index].id, ctx(set));
+      });
+    }
     if ((m = h.match(/^#\/agenda\/([^/]+)\/ensayo(?:\/([a-z]+))?$/))) return () => agenda.renderEnsayo(decodeURIComponent(m[1]), m[2] || '');
     if ((m = h.match(/^#\/agenda\/([^/]+)$/))) return () => agenda.renderOne(decodeURIComponent(m[1]));
   }
@@ -1174,7 +1232,7 @@ function route() {
   if ((m = h.match(/^#\/set\/([^/]+)\/(\d+)$/))) {
     const set = getSetlist(m[1]);
     const index = Number(m[2]);
-    if (set && set.items[index]) return () => renderSong(set.items[index].id, { set, index });
+    if (set && set.items[index]) return () => renderSong(set.items[index].id, setCtx(set, index));
     return () => renderSetlist(m[1]);
   }
   if ((m = h.match(/^#\/set\/([^/]+)$/))) return () => renderSetlist(m[1]);

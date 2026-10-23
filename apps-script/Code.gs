@@ -84,6 +84,15 @@ function prepararComposiciones() {
   Logger.log('Listo: ' + ss.getUrl());
 }
 
+/**
+ * Córrela una vez después de activar el servicio "Drive API" (Servicios → + → Drive API) para
+ * dar permiso de leer texto de fotos. Crea un documento de prueba y lo borra.
+ */
+function prepararTranscripcion() {
+  const blob = Utilities.newBlob('Zamar', 'text/plain', 'prueba-transcripcion.txt');
+  Logger.log('Transcripción lista: ' + JSON.stringify(ACTIONS.transcribe({ data: Utilities.base64Encode(blob.getBytes()), mimeType: 'text/plain' })));
+}
+
 // ---------- utilidades ----------
 function normalize(s) {
   return String(s == null ? '' : s)
@@ -324,6 +333,26 @@ const ACTIONS = {
     compSheet('Audios').appendRow(AUDIO_HEADERS.map((h) => audio[h]));
     log('Audio de composición', p.id, name, p.who);
     return { ok: true, audio: audio };
+  },
+
+  // Foto de una hoja escrita (a mano o impresa) → texto, con el reconocimiento de Google Drive.
+  // Necesita el servicio avanzado "Drive API" activado en el editor. El documento temporal se borra.
+  transcribe(p) {
+    if (typeof Drive === 'undefined') {
+      throw new Error('Falta activar "Drive API" en Servicios del Apps Script para transcribir fotos.');
+    }
+    const bytes = Utilities.base64Decode(p.data || '');
+    if (!bytes.length) throw new Error('La foto está vacía.');
+    if (bytes.length > 10 * 1024 * 1024) throw new Error('La foto pesa más de 10 MB.');
+    const blob = Utilities.newBlob(bytes, p.mimeType || 'image/jpeg', 'transcripcion');
+    const doc = Drive.Files.create({ name: 'Zamar · transcripción temporal', mimeType: MimeType.GOOGLE_DOCS }, blob, { ocrLanguage: 'es' });
+    try {
+      const text = DocumentApp.openById(doc.id).getBody().getText();
+      log('Transcripción', '', text.length + ' letras', p.who);
+      return { ok: true, text: text.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim() };
+    } finally {
+      Drive.Files.remove(doc.id);
+    }
   },
 
   // ---------- grabaciones de ensayo ----------

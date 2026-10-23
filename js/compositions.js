@@ -469,6 +469,28 @@ export function setupCompositions(ctx) {
   }
 
   // ---------- crear y editar ----------
+  /** Achica la foto (lado mayor de 2000 px, JPEG) para que suba rápido; el texto se lee igual. */
+  async function shrinkPhoto(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, bad) => {
+        const i = new Image();
+        i.onload = () => ok(i);
+        i.onerror = () => bad(new Error('No pude abrir la foto. Prueba con otra en JPG o PNG.'));
+        i.src = url;
+      });
+      const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+      if (scale === 1 && /jpe?g/i.test(file.type) && file.size < 3e6) return file;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      return await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.85));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   function renderEdit(id) {
     ensure(() => {
       const c = id ? byId(id) : null;
@@ -490,7 +512,9 @@ export function setupCompositions(ctx) {
             <label class="field"><span>Tono</span><input name="Tono" value="${esc(v.key ? keyName(v.key) : '')}" placeholder="G, Bb, F#m…"></label>
             <label class="field"><span>BPM</span><input name="BPM" value="${esc(v.bpm || '')}" inputmode="numeric" pattern="[0-9]*"></label>
           </div>
-          <label class="field"><span>Letra</span><textarea name="Letra" rows="8" spellcheck="true" class="prose">${esc(v.lyrics)}</textarea></label>
+          <label class="field"><span>Letra <button type="button" class="link" data-pick="photo">📷 Transcribir foto</button></span>
+            <textarea name="Letra" rows="8" spellcheck="true" class="prose">${esc(v.lyrics)}</textarea></label>
+          <input type="file" id="photofile" accept="image/*" hidden>
           <label class="field"><span>Acordes (ChordPro) <button type="button" class="link" data-pick="cho">Cargar .cho</button></span>
             <textarea name="Acordes" rows="10" spellcheck="false" placeholder="[G]Primera [D]línea del coro…">${esc(v.chords)}</textarea></label>
           <details class="ideas"><summary>💡 ¿No sabes qué acordes usar? Ideas de progresiones</summary><div data-ideas></div></details>
@@ -518,6 +542,31 @@ export function setupCompositions(ctx) {
         });
       ideasHere();
       form.elements.Tono.addEventListener('change', ideasHere);
+      // Foto de la hoja escrita → texto en la letra, para revisarlo antes de guardar.
+      app.querySelector('[data-pick="photo"]').addEventListener('click', () => app.querySelector('#photofile').click());
+      app.querySelector('#photofile').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        const b = app.querySelector('[data-pick="photo"]');
+        b.disabled = true;
+        msg('Leyendo la foto… puede tardar unos segundos.');
+        try {
+          const photo = await shrinkPhoto(file);
+          const { text } = await api('transcribe', { data: await readBase64(photo), mimeType: photo.type });
+          if (!text) {
+            msg('No encontré texto en la foto. Prueba con más luz y la hoja derecha.');
+          } else {
+            const t = form.elements.Letra;
+            t.value = (t.value.trim() ? t.value.replace(/\s*$/, '\n\n') : '') + text;
+            t.focus();
+            msg('Listo: agregué el texto a la letra. Revísalo (la letra a mano no siempre sale perfecta) y toca Guardar.');
+          }
+        } catch (err) {
+          msg(err.message);
+        }
+        b.disabled = false;
+      });
       app.querySelector('[data-pick="cho"]').addEventListener('click', () => app.querySelector('#chofile').click());
       app.querySelector('#chofile').addEventListener('change', async (e) => {
         const file = e.target.files[0];

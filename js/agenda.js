@@ -841,5 +841,5 @@ export function setupAgenda(ctx) {
     events: () => data.events || [],
   });
 
-  return { renderList, renderOne, renderEdit, nextBanner, renderEnsayo: ensayo.render };
+  return { renderList, renderOne, renderEdit, nextBanner, renderEnsayo: ensayo.render, withRehearsalSongs: ensayo.withSongs };
 }

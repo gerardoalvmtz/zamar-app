@@ -312,12 +312,12 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
-  font: 15px/1.55 var(--mono);
+  font: calc(15px * var(--fs, 1))/1.55 var(--mono);
   white-space: pre-wrap;
   overflow-x: auto;
 }
 
-.sheet.lyrics { font: 1.08rem/1.7 var(--serif); }
+.sheet.lyrics { font: calc(1.08rem * var(--fs, 1))/1.7 var(--serif); }
 
 .chord { color: var(--chord); font-weight: 700; }
 
@@ -860,3 +860,6 @@ details.recadd .recorder { margin-top: 8px; }
 [hidden] { display: none !important; }
 .sheettools { display: block; margin-top: 12px; }
 .sheettools button { width: 100%; }
+.fontsize { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 8px 0; }
+.fontsize button { min-width: 48px; padding: 6px 12px; }
+.fontsize span { min-width: 3.5em; text-align: center; font-size: 0.85rem; color: var(--muted); }

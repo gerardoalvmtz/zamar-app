@@ -85,6 +85,10 @@ const PRL = (c) =>
 
 const same = (a, b) => a.pc === b.pc && a.q === b.q;
 
+// Un puente puede tener hasta 6 acordes contando el de salida y el de llegada.
+export const MAX_CHORDS = 6;
+
+
 /** Camino más corto de transformaciones P, R y L desde `start` hasta algún acorde de `goals`. */
 function prlPath(start, goals, maxDepth = 3) {
   let frontier = [[start]];
@@ -202,6 +206,23 @@ export function bridges(from, to) {
   const toChords = diatonic(to);
   const common = toChords.filter((c) => fromChords.some((f) => same(f, c)));
   const relation = keyRelation(from, to).label;
+
+  // Qué tan brusco se siente cada cambio: lo que se mueven las voces (al cuadrado, para que un
+  // salto pese más que dos pasos chicos), a la mitad si la raíz cae una quinta (V → I, ii → V:
+  // el oído lo espera), y más si los dos acordes no caben juntos en ninguno de los dos tonos.
+  // El camino se califica por su paso promedio y por su paso más brusco, no por el total, así
+  // que uno de 6 acordes que se mueve poco le gana a uno de 3 con un brinco.
+  const inKey = (c, chords) => chords.some((x) => x.pc === c.pc && (x.q === c.q || (x.q === '' && (c.q === '7' || c.q === 'sus4')) || (x.q === 'm' && c.q === 'm7')));
+  const together = (a, b) => (inKey(a, fromChords) && inKey(b, fromChords)) || (inKey(a, toChords) && inKey(b, toChords));
+  const stepCost = (a, b) => {
+    let c = motion(a, b) ** 2 / 4;
+    if (mod(a.pc - b.pc) === 7 || (a.pc === b.pc && a.q === 'sus4')) c /= 2;
+    return c + (together(a, b) ? 0 : 3);
+  };
+  const routeCost = (steps, penalty = 0) => {
+    const each = steps.slice(1).map((c, i) => stepCost(steps[i], c));
+    return each.reduce((s, x) => s + x, 0) / each.length + Math.max(...each) / 2 + penalty;
+  };
   const closeness = same(S, E) ? 'same' : common.length >= 4 ? 'near' : common.length >= 2 ? 'mid' : 'far';
 
   // Nombre de cada nota según el acorde al que pertenece: la tercera menor de C es Eb, no D#.
@@ -232,7 +253,7 @@ export function bridges(from, to) {
     });
     const moves = o.steps.slice(1).reduce((s, c, i) => s + motion(o.steps[i], c), 0);
     const dominant = o.steps.some((c) => c.q === '7' && c.pc === V7.pc);
-    return { name: o.name, why: o.why, steps, moves, dominant, cost: moves + (o.penalty || 0) + o.steps.length };
+    return { name: o.name, why: o.why, steps, moves, dominant, cost: routeCost(o.steps, o.penalty) };
   };
 
   if (closeness === 'same') {
@@ -291,7 +312,6 @@ export function bridges(from, to) {
       name: 'Notas en común',
       why: `Cada acorde comparte dos notas con el anterior, así que siempre hay algo que se sostiene mientras el resto se mueve un paso. Cuando llegas a ${name(mid[mid.length - 1])} ya estás en ${tName}.`,
       steps: [S, ...mid, V7, E],
-      penalty: mid.length > 2 ? 2 : 0,
     });
   }
 
@@ -366,6 +386,43 @@ export function bridges(from, to) {
       why: `Sube ${up === 1 ? 'medio tono' : 'un tono'}: corta en seco al final de la frase y entra con ${name(V7)} en el último tiempo.`,
       steps: [S, { ...V7, role: `${V7.role}, un tiempo` }, E],
       penalty: 6,
+    });
+  }
+
+  // 11. Camino suave: entre los acordes de los dos tonos, la ruta de hasta 6 acordes en la que
+  //     cada paso mueve lo menos posible. Una vez que entra a acordes del tono nuevo ya no
+  //     regresa al anterior.
+  const pool = [];
+  for (const c of [...fromChords, ...toChords]) {
+    if ((c.q !== '' && c.q !== 'm') || same(c, S) || same(c, E) || pool.some((p) => same(p, c))) continue;
+    if (c.pc === V7.pc && c.q === '') continue; // la V del tono nuevo entra como V7 al final
+    if (c.deg === 'V' && from.minor && degIn(c, fromChords) === 'V') continue; // pide volver a la tónica vieja
+    const old = !degIn(c, toChords);
+    pool.push({ pc: c.pc, q: c.q, role: roleOf(c), newKey: !degIn(c, fromChords), ...(old ? { fromName: true } : {}) });
+  }
+  const endings = [[V7, E], [Vsus, V7, E]];
+  let smooth = null;
+  const walk = (path) => {
+    for (const end of endings) {
+      const steps = [...path, ...end];
+      if (steps.length > MAX_CHORDS || steps.length < 5) continue;
+      const cost = routeCost(steps);
+      if (!smooth || cost < smooth.cost) smooth = { steps, cost };
+    }
+    if (path.length + 2 >= MAX_CHORDS) return;
+    const last = path[path.length - 1];
+    for (const c of pool) {
+      if (path.includes(c) || (last.newKey && !c.newKey)) continue;
+      walk([...path, c]);
+    }
+  };
+  walk([S]);
+  if (smooth) {
+    const mid = smooth.steps.slice(1, -2).filter((c) => c !== Vsus);
+    add({
+      name: 'Camino suave',
+      why: `Pasa por ${mid.map(name).join(', ')}: acordes de los dos tonos escogidos para que cada cambio mueva lo menos posible. Es más largo, pero ningún paso brinca; dale un compás a cada acorde.`,
+      steps: smooth.steps,
     });
   }
 

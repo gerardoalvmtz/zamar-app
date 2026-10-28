@@ -17,6 +17,7 @@ test('tonos vecinos: acorde en común, con las notas que se sostienen', () => {
   const r = b('G', 'A');
   assert.equal(path(r.options[0]), 'G Bm E7 A');
   assert.deepEqual(r.options[0].steps[1].glue, ['B', 'D']);
+  assert.equal(path(route(r, 'Camino suave')), 'G C Am Esus4 E7 A');
   assert.equal(path(route(r, 'Disminuido de paso')), 'G G#°7 A');
   assert.ok(route(r, 'Subida'));
 });
@@ -24,28 +25,27 @@ test('tonos vecinos: acorde en común, con las notas que se sostienen', () => {
 test('relativas: de mayor a su menor', () => {
   const r = b('D', 'Bm');
   assert.equal(r.closeness, 'near');
-  assert.equal(path(r.options[0]), 'D F#sus4 F#7 Bm');
+  assert.equal(path(r.options[0]), 'D F#m F#sus4 F#7 Bm');
   assert.equal(path(route(r, 'ii – V')), 'D C#m7b5 F#7 Bm');
 });
 
 test('el IV que se vuelve menor, con el bajo caminando', () => {
-  assert.equal(path(b('C', 'G').options[0]), 'C Cm G');
+  assert.equal(path(route(b('C', 'G'), 'Cuarto menor')), 'C Cm G');
   const r = b('F', 'Ab');
   assert.equal(r.closeness, 'far');
-  assert.equal(path(r.options[0]), 'F Db/F Dbm Ab');
+  assert.equal(path(route(r, 'Cuarto menor')), 'F Db/F Dbm Ab');
   assert.equal(path(route(r, 'ii – V')), 'F Bbm7 Eb7 Ab');
   assert.equal(path(route(r, 'Dominante con sus')), 'F Ebsus4 Eb7 Ab');
-  assert.match(r.tip, /Nota puente: F/);
   assert.equal(path(route(b('G', 'A'), 'Cuarto menor')), 'G D/F# Dm A');
 });
 
 test('tonos a tercera mayor: el aumentado como portal', () => {
-  assert.equal(path(b('C', 'E').options[0]), 'C C+ E');
+  assert.equal(path(route(b('C', 'E'), 'Aumentado')), 'C C+ E');
   assert.equal(path(route(b('Bb', 'D'), 'Aumentado')), 'Bb Bb+ D');
 });
 
 test('las notas se escriben según el acorde', () => {
-  const cm = b('E', 'G').options[0].steps.find((s) => s.chord === 'Cm');
+  const cm = route(b('E', 'G'), 'Cuarto menor').steps.find((s) => s.chord === 'Cm');
   assert.equal(cm.keys, 'C-Eb-G');
 });
 
@@ -61,6 +61,16 @@ test('en todos los pares de tonos, el camino recomendado no hace saltar a la man
         }
       }
     }
+});
+
+test('tonos lejanos: el camino recomendado da más pasos chicos, hasta 6 acordes', () => {
+  const r = b('F', 'Ab');
+  assert.equal(path(r.options[0]), 'F Am C Cm Eb7 Ab');
+  assert.match(r.tip, /Nota puente: C/);
+  // Los acordes que solo son del tono viejo se escriben como en el tono viejo.
+  assert.equal(path(b('A', 'F').options[0]), 'A C#m E Am C7 F');
+  const keys = [false, true].flatMap((minor) => Array.from({ length: 12 }, (_, pc) => ({ pc, minor })));
+  for (const f of keys) for (const t of keys) assert.ok(bridges(f, t).options.every((o) => o.steps.length <= 6));
 });
 
 test('mismo tono', () => {

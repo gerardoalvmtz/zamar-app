@@ -76,8 +76,10 @@ Se pide un PIN que el ministerio comparte. Todo se guarda en el mismo Sheets y q
 Cuando dos canciones seguidas de un setlist están en tonos distintos, la app propone el camino de acordes para
 pasar de una a otra sin que suene brusco. Prueba varios recursos (acorde en común, tónica a menor o mayor, notas
 en común con las transformaciones P, R y L, el IV que se vuelve menor, disminuido de paso, aumentado como portal,
-ii–V, dominante suspendida, sustituto tritonal y subida) y mide cada uno nota por nota: recomienda el que menos
-mueve las voces, una idea tomada de *Armonía Ilustrada* de Brian Callipari. Cada acorde muestra su función (por
+ii–V, dominante suspendida, sustituto tritonal y subida) y además busca un **camino suave** de hasta 6 acordes
+entre los acordes de los dos tonos. Mide cada cambio nota por nota (idea tomada de *Armonía Ilustrada* de Brian
+Callipari) y recomienda el camino cuyo paso promedio y paso más brusco sean los más chicos, así que un camino largo
+de pasos pequeños le gana a uno corto con un brinco (F → Am → C → Cm → Eb7 → Ab). Cada acorde muestra su función (por
 ejemplo *V7 de A*) y las notas que comparte con el anterior; cada camino trae las notas para la mano derecha ya
 acomodadas en la inversión más cercana, con el bajo caminando por pasos cuando se puede (G → D/F# → Dm → A), y un
 botón ▶ Escuchar con piano. También sugiere una nota que voces o teclado pueden sostener, y un consejo si cambia

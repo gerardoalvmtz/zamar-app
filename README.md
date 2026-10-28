@@ -49,7 +49,7 @@ transponen al cambiar el tono.
 
 - Página de **Inicio** con la foto del equipo, el próximo evento, la última canción abierta y accesos a cada
   sección (Canciones, Setlists, Agenda y Composiciones). El repertorio está en `#/canciones`.
-- Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus y canciones católicas.
+- Buscar por título o autor, ordenar por canción o autor, y filtrar con selección múltiple por tema, voz principal, tono, estatus, canciones católicas y canciones sin acordes. Las que no tienen acordes en la pestaña Letras llevan la marca "Sin acordes" en la lista.
 - Cambiar el tono de una canción (los acordes se transponen solos). El tono elegido se recuerda en cada teléfono.
 - Cambiar el tamaño de la letra en Letra y Acordes (A− / A+); se recuerda en cada teléfono.
 - Exportar la hoja de acordes de una canción a PDF en el tono elegido (botón debajo de los acordes): acordes en

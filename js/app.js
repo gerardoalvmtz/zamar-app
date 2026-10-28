@@ -61,6 +61,7 @@ const state = {
     q: '',
     sort: savedFilters.sort || 'title',
     catholic: Boolean(savedFilters.catholic),
+    noChords: Boolean(savedFilters.noChords),
     ...Object.fromEntries(FILTER_GROUPS.map((g) => [g, new Set(savedFilters[g] || [])])),
   },
 };
@@ -70,6 +71,7 @@ function saveFilters() {
   store.set('zamar:filters', {
     sort: f.sort,
     catholic: f.catholic,
+    noChords: f.noChords,
     ...Object.fromEntries(FILTER_GROUPS.map((g) => [g, [...f[g]]])),
   });
 }
@@ -243,7 +245,8 @@ function matches(s) {
     (!f.voices.size || f.voices.has(s.voice)) &&
     (!f.keys.size || (s.key && f.keys.has(keyName(s.key)))) &&
     (!f.statuses.size || f.statuses.has(s.status)) &&
-    (!f.catholic || s.catholic)
+    (!f.catholic || s.catholic) &&
+    (!f.noChords || !hasChords(s))
   );
 }
 
@@ -256,6 +259,9 @@ function sortedSongs(list) {
   return [...list].sort(cmp);
 }
 
+// La canción ya tiene su hoja de acordes (pestaña Letras, columna Acordes).
+const hasChords = (s) => Boolean(s.chords && s.chords.trim());
+
 function songRow(s, href = `#/c/${encodeURIComponent(s.id)}`) {
   const key = s.key ? keyName(s.key) : '';
   const sub = state.filters.sort === 'author' ? [s.author || 'Autor sin registrar', s.title] : [s.author || 'Autor sin registrar'];
@@ -267,13 +273,14 @@ function songRow(s, href = `#/c/${encodeURIComponent(s.id)}`) {
     <span class="song-meta">
       ${key ? `<span class="key">${esc(key)}</span>` : ''}
       ${s.bpm ? `<span class="bpm">${s.bpm}</span>` : ''}
+      ${hasChords(s) ? '' : '<span class="nochords" title="Le faltan los acordes">Sin acordes</span>'}
       <span class="dot ${statusClass(s.status)}" title="${esc(s.status)}"></span>
     </span>
   </a>`;
 }
 
 const activeCount = () =>
-  FILTER_GROUPS.reduce((n, g) => n + state.filters[g].size, 0) + (state.filters.catholic ? 1 : 0);
+  FILTER_GROUPS.reduce((n, g) => n + state.filters[g].size, 0) + (state.filters.catholic ? 1 : 0) + (state.filters.noChords ? 1 : 0);
 
 function filterPanel() {
   const f = state.filters;
@@ -290,6 +297,7 @@ function filterPanel() {
     }).join('')}
     <fieldset><legend>Otros</legend><div class="chips">
       <button class="chip toggle" data-group="catholic" aria-pressed="${f.catholic}">Solo católicas</button>
+      <button class="chip toggle" data-group="noChords" aria-pressed="${f.noChords}">Sin acordes</button>
     </div></fieldset>
     ${activeCount() ? '<button class="link" data-action="clear">Quitar filtros</button>' : ''}
   </div>`;
@@ -1286,7 +1294,7 @@ app.addEventListener('click', async (e) => {
   const chip = e.target.closest('[data-group]');
   if (chip) {
     const g = chip.dataset.group;
-    if (g === 'catholic') state.filters.catholic = !state.filters.catholic;
+    if (g === 'catholic' || g === 'noChords') state.filters[g] = !state.filters[g];
     else if (state.filters[g].has(chip.dataset.value)) state.filters[g].delete(chip.dataset.value);
     else state.filters[g].add(chip.dataset.value);
     saveFilters();
@@ -1328,6 +1336,7 @@ app.addEventListener('click', async (e) => {
   } else if (action === 'clear') {
     FILTER_GROUPS.forEach((g) => state.filters[g].clear());
     state.filters.catholic = false;
+    state.filters.noChords = false;
     saveFilters();
     renderList();
   } else if (action === 'reload') {

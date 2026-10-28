@@ -546,7 +546,7 @@ function renderSong(id, ctx = null, came = null) {
         ${song.catholic ? '<span class="chip catholic">Católica</span>' : ''}
       </p>
       <p class="status"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}
-        ${canEdit() && !ctx ? `<a class="editlink" href="#/editar/${encodeURIComponent(song.id)}">✎ Editar</a>` : ''}</p>
+        ${canEdit() ? `<a class="editlink" href="#/editar/${encodeURIComponent(song.id)}${ctx ? `?volver=${encodeURIComponent(ctx.href(ctx.index))}` : ''}">✎ Editar</a>` : ''}</p>
 
       <section class="card keybox">
         ${
@@ -1199,7 +1199,9 @@ function route() {
   const h = location.hash;
   let m;
   if (editing) {
-    if ((m = h.match(/^#\/editar\/(.+)$/))) return () => editing.renderEdit(decodeURIComponent(m[1]));
+    // ?volver= regresa a la canción dentro del setlist o del ensayo después de editarla.
+    if ((m = h.match(/^#\/editar\/([^?]+)(?:\?volver=(.+))?$/)))
+      return () => editing.renderEdit(decodeURIComponent(m[1]), m[2] && /^#\//.test(decodeURIComponent(m[2])) ? decodeURIComponent(m[2]) : '');
     if (h === '#/nueva') return () => editing.renderEdit('');
     if (h === '#/importar') return editing.renderImport;
     if (h === '#/comp') return comps.renderList;

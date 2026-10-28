@@ -716,7 +716,12 @@ function renderSong(id, ctx = null, came = null) {
 
 // ---------- tamaño de letra en letras y acordes (se recuerda en cada teléfono) ----------
 const FONT_STEPS = [0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
-const fontStep = () => Math.min(Math.max(Number(store.get('zamar:fontsize', 2)) || 0, 0), FONT_STEPS.length - 1);
+// Se guarda el tamaño (0.8, 1.15…) y no la posición en la lista: store.set borra el valor 0,
+// así que guardar la posición hacía que el más chico (posición 0) regresara al 100%.
+const fontStep = () => {
+  const i = FONT_STEPS.indexOf(Number(store.get('zamar:fontscale', 1)));
+  return i < 0 ? FONT_STEPS.indexOf(1) : i;
+};
 const applyFontSize = () => document.documentElement.style.setProperty('--fs', FONT_STEPS[fontStep()]);
 applyFontSize();
 
@@ -734,7 +739,7 @@ function wireFontSize() {
   app.querySelectorAll('[data-font]').forEach((b) =>
     b.addEventListener('click', () => {
       const n = Math.min(Math.max(fontStep() + Number(b.dataset.font), 0), FONT_STEPS.length - 1);
-      store.set('zamar:fontsize', n);
+      store.set('zamar:fontscale', FONT_STEPS[n]);
       applyFontSize();
       app.querySelector('#fontpct').textContent = `${Math.round(FONT_STEPS[n] * 100)}%`;
       app.querySelector('[data-font="-1"]').disabled = n === 0;

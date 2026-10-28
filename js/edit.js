@@ -28,8 +28,8 @@ export function setupEditing(ctx) {
   const area = (label, name, value, rows, extra = '') =>
     `<label class="field"><span>${label}${extra}</span><textarea name="${name}" rows="${rows}" spellcheck="false">${esc(value)}</textarea></label>`;
 
-  /** Formulario de edición; con id vacío agrega una canción nueva. */
-  function renderEdit(id) {
+  /** Formulario de edición; con id vacío agrega una canción nueva. back: a dónde regresar. */
+  function renderEdit(id, back = '') {
     const song = id ? songById(id) : null;
     if (id && !song) {
       app.innerHTML = `${backHeader('#/canciones', 'Repertorio')}<p class="empty">No encontré esta canción.</p>`;
@@ -49,9 +49,10 @@ export function setupEditing(ctx) {
       Spotify: s.spotify,
     };
     const texts = { Letra: s.lyrics || '', Acordes: s.chords || '', Tabs: s.tabs || '' };
+    const done = back || (song ? `#/c/${encodeURIComponent(song.id)}` : '#/');
     document.title = `${song ? 'Editar' : 'Nueva canción'} · Zamar`;
     app.innerHTML = `
-      ${backHeader(song ? `#/c/${encodeURIComponent(song.id)}` : '#/', song ? song.title : 'Repertorio')}
+      ${backHeader(done, song ? song.title : 'Repertorio')}
       <form class="detail editor" id="editor">
         <h1>${song ? 'Editar canción' : 'Nueva canción'}</h1>
         ${song ? '' : field('Canción', 'Canción', '', 'required')}
@@ -89,7 +90,7 @@ export function setupEditing(ctx) {
         <p class="hint" id="editmsg"></p>
         <div class="row actions">
           <button type="submit" class="primary">Guardar</button>
-          <a class="button ghost" href="${song ? `#/c/${encodeURIComponent(song.id)}` : '#/'}">Cancelar</a>
+          <a class="button ghost" href="${done}">Cancelar</a>
         </div>
       </form>`;
 
@@ -155,7 +156,7 @@ export function setupEditing(ctx) {
         // La hoja tarda un poco en publicar el cambio; se vuelve a leer en segundo plano.
         setTimeout(() => loadSongs({ quiet: true }), 4000);
         if (song) applyLocal(song, mainChanges, textChanges);
-        location.hash = song ? `#/c/${encodeURIComponent(song.id)}` : '#/';
+        location.hash = done;
       } catch (err) {
         msg(err.message);
         button.disabled = false;

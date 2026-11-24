@@ -874,3 +874,41 @@ details.recadd .recorder { margin-top: 8px; }
 .fontsize { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 8px 0; }
 .fontsize button { min-width: 48px; padding: 6px 12px; }
 .fontsize span { min-width: 3.5em; text-align: center; font-size: 0.85rem; color: var(--muted); }
+
+/* ---------- guitarra: diagramas y progresiones ---------- */
+.sheet .ch, .sheet .cp > .chord { cursor: pointer; }
+details.gtr { margin: 10px 0 0; }
+details.gtr > summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 4px 0; }
+details.gtr[open] > summary { color: var(--text); }
+.songgtr { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.gdiags { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; margin-top: 8px; }
+.gcell { padding: 2px; border: 0; border-radius: 12px; background: var(--sunken); color: var(--text); cursor: pointer; }
+.gdiag { display: block; width: 100%; height: auto; color: var(--text); }
+.gdiag .gline { stroke: currentColor; stroke-width: 1; opacity: 0.45; }
+.gdiag .gnut { fill: currentColor; }
+.gdiag .gdot { fill: currentColor; }
+.gdiag .gopen { fill: none; stroke: currentColor; stroke-width: 1.4; }
+.gdiag text { fill: currentColor; font-family: var(--sans); text-anchor: middle; }
+.gdiag .gname { font-size: 13px; font-weight: 700; fill: var(--chord); }
+.gdiag .gmark { font-size: 11px; }
+.gdiag .gfret { font-size: 10px; text-anchor: end; }
+.gdiag .gnone { font-size: 18px; opacity: 0.5; }
+.gpos { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; }
+.gpos .hint { margin-right: 2px; }
+.gpos button { min-width: 38px; padding: 6px 0; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font-weight: 700; }
+.gpos button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.chorddialog { width: min(86vw, 320px); text-align: center; }
+.chordbig { width: min(62vw, 220px); margin: 0 auto; }
+.chordnav { justify-content: space-between; align-items: center; margin-top: 8px; }
+.chordnav button { min-width: 48px; font-size: 1.3rem; }
+.chorddialog .actions { justify-content: center; margin-top: 10px; }
+.progsused { margin: 0 0 12px; }
+.progsused a { color: var(--text); font-weight: 600; }
+.library .libctl { display: grid; gap: 10px; }
+.library .libctl .hint { margin: 0; }
+.library h2 { margin-top: 26px; }
+.route.focus { border-color: var(--chord); box-shadow: 0 0 0 2px color-mix(in srgb, var(--chord) 35%, transparent); }
+.route .degs { font: 700 1.05rem/1.2 var(--mono); }
+.library .libctl { display: grid; grid-template-columns: 1fr; }
+.chordnav { display: flex; }
+.chorddialog .actions { display: flex; }

@@ -93,7 +93,15 @@ export function renderChordSheet(text, shift = 0, flats = false) {
         .join('');
       out.push(`<span class="cpline">${html}</span>`);
     } else if (isChordLine(raw)) {
-      out.push(`<span class="chord">${esc(transposeChordLine(raw, shift, flats))}</span>`);
+      // Cada acorde en su propio <span class="ch"> para poder tocarlo y ver su diagrama.
+      const line = transposeChordLine(raw, shift, flats)
+        .split(/(\s+)/)
+        .map((tok) => {
+          const bare = tok.replace(/^\(|\)$/g, '');
+          return bare && isChord(bare) ? esc(tok).replace(esc(bare), `<span class="ch">${esc(bare)}</span>`) : esc(tok);
+        })
+        .join('');
+      out.push(`<span class="chord">${line}</span>`);
     } else {
       out.push(esc(raw));
     }
@@ -203,4 +211,28 @@ export function tabsFromChords(text) {
 /** Letra lista para mostrar: los títulos de sección [[Coro]] se resaltan. */
 export function renderLyrics(text) {
   return esc(text).replace(/\[\[([^\]]+)\]\]/g, '<span class="section">$1</span>');
+}
+
+/**
+ * Los acordes de la hoja en el orden en que aparecen (sin tabs), transpuestos `shift`
+ * semitonos. unique=true deja solo la primera vez que aparece cada uno.
+ */
+export function chordsInSheet(text, { shift = 0, flats = false, unique = false } = {}) {
+  const out = [];
+  let inTab = false;
+  for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
+    const d = raw.match(DIRECTIVE);
+    if (d) {
+      const name = d[1].toLowerCase();
+      if (isTabStart(name)) inTab = true;
+      else if (SECTION_END.has(name)) inTab = false;
+      continue;
+    }
+    if (inTab) continue;
+    let found = [];
+    if (/\[[^\]]+\]/.test(raw)) found = [...raw.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim().replace(/^\*/, ''));
+    else if (isChordLine(raw)) found = raw.trim().split(/\s+/).map((t) => t.replace(/^\(|\)$/g, ''));
+    for (const c of found) if (isChord(c)) out.push(shift ? transposeChord(c, shift, flats) : c);
+  }
+  return unique ? [...new Set(out)] : out;
 }

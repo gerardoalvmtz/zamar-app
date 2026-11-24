@@ -2,7 +2,7 @@ import { sheetCsvUrl, LYRICS_GID } from './config.js';
 import { parseCsv, rowsToSongs, rowsToTexts, attachTexts, suggestions, normalize } from './songs.js';
 import { keyName, transposeKey, useFlats, semitonesBetween, parseKey, keyRelation } from './music.js';
 import { renderChordSheet, chordSheetLines, lyricsFromChords, tabsFromChords, renderLyrics, sheetKey, chordsInSheet } from './chordpro.js';
-import { setupLibrary, songProgressions, majorOf, pretty, diagramsHtml, positionPicker, showChord } from './library.js';
+import { setupLibrary, songProgressions, majorOf, pretty, diagramsHtml, positionPicker, showChord, colorSheet } from './library.js';
 import {
   allSetlists,
   getSetlist,
@@ -466,7 +466,7 @@ function renderSong(id, ctx = null, came = null) {
   // Las hojas de Songbook Pro traen {key: X}; si no, se asume que están en el tono que toca Zamar.
   const written = sheetKey(song.chords) || song.key;
   const chordShift = key && written ? semitonesBetween(written, key) : 0;
-  const flats = useFlats(key);
+  const flats = useFlats(key || written); // sin tono en la hoja, se respeta cómo viene escrita (Bb, no A#)
 
   const lyrics = song.lyrics || lyricsFromChords(song.chords);
   const tabs = song.tabs || tabsFromChords(song.chords);
@@ -489,7 +489,10 @@ function renderSong(id, ctx = null, came = null) {
   // Guitarra: diagramas de los acordes de la canción (en el tono que se está viendo) y
   // las progresiones conocidas que usa.
   const gtrPos = Number(store.get('zamar:gtrpos', 1)) || 1;
-  const songChords = view === 'acordes' && song.chords ? chordsInSheet(song.chords, { shift: chordShift, flats, unique: true }) : [];
+  // "Darle color": solo cambia cómo se ve en este teléfono; la hoja no se toca.
+  const colored = Boolean(song.chords && written && store.get(`zamar:color:${song.id}`, false));
+  const sheetText = colored ? colorSheet(song.chords, written) : song.chords;
+  const songChords = view === 'acordes' && song.chords ? chordsInSheet(sheetText, { shift: chordShift, flats, unique: true }) : [];
   const usedProgs = view === 'acordes' && song.chords ? songProgressions(song.chords, written) : [];
   const libKey = key ? keyName(majorOf(key)) : '';
   const guitar = songChords.length
@@ -513,7 +516,15 @@ function renderSong(id, ctx = null, came = null) {
       ? `<div class="sheet lyrics">${renderLyrics(lyrics)}</div>`
       : '<p class="hint">Aún no hay letra cargada para esta canción.</p>',
     acordes: song.chords
-      ? `${guitar}<div class="sheet">${renderChordSheet(song.chords, chordShift, flats)}</div>
+      ? `${
+          written
+            ? `<div class="colorsel"><div class="basesel seg" role="tablist" aria-label="Acordes">
+                 <button data-color="0" aria-selected="${!colored}">Originales</button>
+                 <button data-color="1" aria-selected="${colored}">🎨 Con color</button>
+               </div>
+               ${colored ? '<p class="hint">Con color: el I con novena (add9), el IV con séptima mayor, el V suspendido y los menores con séptima. Solo se ve así en este teléfono; la hoja no cambia.</p>' : ''}</div>`
+            : ''
+        }${guitar}<div class="sheet">${renderChordSheet(sheetText, chordShift, flats)}</div>
          <div class="row sheettools"><button data-action="chordspdf">📄 PDF de acordes${key ? ` en ${esc(keyName(key))}` : ''}</button></div>
          <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
@@ -705,6 +716,12 @@ function renderSong(id, ctx = null, came = null) {
     }),
   );
   wireFontSize();
+  app.querySelectorAll('[data-color]').forEach((b) =>
+    b.addEventListener('click', () => {
+      store.set(`zamar:color:${song.id}`, b.dataset.color === '1');
+      rerender();
+    }),
+  );
   app.querySelector('.songgtr')?.addEventListener('toggle', (e) => store.set('zamar:gtropen', e.target.open));
   app.querySelectorAll('.songgtr [data-gpos]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -725,7 +742,7 @@ function renderSong(id, ctx = null, came = null) {
     b.disabled = true;
     out.textContent = 'Preparando el PDF…';
     try {
-      const blob = await chordsPdf(song, keyText, chordSheetLines(song.chords, chordShift, flats));
+      const blob = await chordsPdf(song, keyText, chordSheetLines(sheetText, chordShift, flats));
       const how = await shareFile(blob, { name: `${song.title} acordes ${keyText}` }, 'pdf', 'application/pdf');
       out.textContent = how === 'downloaded' ? 'PDF descargado.' : '';
     } catch (err) {

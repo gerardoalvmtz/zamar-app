@@ -39,3 +39,19 @@ test('encuentra las progresiones que usa una canción', () => {
   assert.ok(!found.some((h) => h.id === 'vi-IV-I-V'));
   assert.deepEqual(songProgressions('[G]a [C]b [D]c', parseKey('G')), []);
 });
+
+test('darle color: solo acordes sencillos del tono, la hoja sigue igual', async () => {
+  const { colorChord, colorSheet } = await import('../js/library.js');
+  const G = parseKey('G');
+  assert.equal(colorChord('G', G), 'Gadd9');
+  assert.equal(colorChord('C', G), 'Cmaj7');
+  assert.equal(colorChord('D', G), 'Dsus4');
+  assert.equal(colorChord('Em', G), 'Em7');
+  assert.equal(colorChord('G/B', G), 'Gadd9/B');
+  assert.equal(colorChord('D/F#', G), 'D/F#');
+  assert.equal(colorChord('A7', G), 'A7');
+  assert.equal(colorChord('Cm', G), 'Cm');
+  assert.equal(colorChord('Dm', parseKey('Dm')), 'Dm7');
+  const cho = '{key: G}\n[G]Santo [*C]es\nG   D\n{sot}\nG D\n{eot}';
+  assert.equal(colorSheet(cho, G), '{key: G}\n[Gadd9]Santo [*Cmaj7]es\nGadd9 Dsus4\n{sot}\nG D\n{eot}');
+});

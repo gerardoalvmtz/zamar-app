@@ -1,7 +1,7 @@
 // Biblioteca de progresiones: las progresiones más comunes del pop y del worship, en
 // cualquier tono, con versión sencilla y con color, diagramas de guitarra en 5 posiciones
 // y las canciones del repertorio que ya las usan.
-import { keyName, parseKey } from './music.js';
+import { keyName, parseKey, isChord, isChordLine } from './music.js';
 import { degreeChord, playProgression, stopPlaying } from './progressions.js';
 import { chordsInSheet, sheetKey } from './chordpro.js';
 import { parseChord, positions, nearZone, handZones, diagramSvg } from './guitar.js';
@@ -90,6 +90,71 @@ export function songProgressions(text, key) {
 
 /** Tono mayor desde el que se cuentan los grados de una canción (la relativa si es menor). */
 export const majorOf = (key) => (key ? (key.minor ? { pc: mod(key.pc + 3), minor: false } : key) : null);
+
+// ---------- darle color a una canción ----------
+const SUFFIX = { I: 'add9', ii: '7', iii: '7', IV: 'maj7', V: 'sus4', vi: '7' };
+const PLAIN = /^([A-G][#♯b♭]?)(m?)(\/[A-G][#♯b♭]?)?$/;
+
+/**
+ * La versión con color de un acorde dentro de un tono: solo cambian los acordes sencillos
+ * (mayores o menores, con o sin bajo) que son del tono. Ej. en Sol: G → Gadd9, C → Cmaj7,
+ * D → Dsus4, Em → Em7, G/B → Gadd9/B. Lo demás se queda igual.
+ */
+export function colorChord(name, key) {
+  const m = String(name).match(PLAIN);
+  if (!m || !key) return name;
+  const c = parseChord(name);
+  const tonic = majorOf(key).pc;
+  const hit = DEG_OF[mod(c.root - tonic)];
+  if (!hit || hit[1] !== (m[2] === 'm')) return name;
+  if (m[3] && SUFFIX[hit[0]] === 'sus4') return name; // D/F# lleva la tercera en el bajo: suspendido chocaría
+  return m[1] + m[2] + SUFFIX[hit[0]] + (m[3] || '');
+}
+
+/** Cambia los acordes de una línea de acordes cuidando que sigan alineados con la letra. */
+function mapChordLine(line, fn) {
+  let out = '';
+  let debt = 0;
+  for (const part of line.split(/(\s+)/)) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) {
+      const keep = Math.max(1, part.length - debt);
+      debt -= part.length - keep;
+      out += ' '.repeat(keep);
+      continue;
+    }
+    const bare = part.replace(/^\(|\)$/g, '');
+    const next = isChord(bare) ? part.replace(bare, fn(bare)) : part;
+    debt += next.length - part.length;
+    if (debt < 0) {
+      out += next + ' '.repeat(-debt);
+      debt = 0;
+    } else out += next;
+  }
+  return out;
+}
+
+/** La hoja completa con color, en el mismo formato. No cambia nada en la hoja original. */
+export function colorSheet(text, key) {
+  if (!key) return text;
+  const fn = (c) => colorChord(c, key);
+  let inTab = false;
+  return String(text || '')
+    .split('\n')
+    .map((line) => {
+      const d = line.match(/^\s*\{\s*([a-z_]+)/i);
+      if (d) {
+        const n = d[1].toLowerCase();
+        if (/^(sot|sog|start_of_tab|start_of_grid)$/.test(n)) inTab = true;
+        if (/^(eot|eog|end_of_tab|end_of_grid)$/.test(n)) inTab = false;
+        return line;
+      }
+      if (inTab) return line;
+      if (/\[[^\]]+\]/.test(line)) return line.replace(/\[(\*?)([^\]]+)\]/g, (all, star, c) => (isChord(c.trim()) ? `[${star}${fn(c.trim())}]` : all));
+      return isChordLine(line) ? mapChordLine(line, fn) : line;
+    })
+    .join('\n');
+}
 
 // ---------- diagramas de guitarra ----------
 

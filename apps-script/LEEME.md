@@ -73,7 +73,7 @@ El programa, la minuta y las tareas de cada ensayo se guardan como texto JSON en
 ## Arreglo por sección (vista por instrumento)
 
 El arreglo de cada canción (compases, dinámica, quién canta y notas por sección) se guarda en la columna
-*Partes* de la pestaña *Letras*, un renglón por sección: `CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo`.
+*Partes* de la pestaña *Letras*, un renglón por sección: `CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo | piano | eléctrica | acústica`.
 La columna se agrega sola la primera vez que alguien guarda un arreglo. Solo hay que pegar el código nuevo y
 volver a implementar como **Nueva versión**; con el código anterior, la app avisa que el arreglo no se guardó.
 

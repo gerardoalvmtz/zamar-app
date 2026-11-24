@@ -62,12 +62,14 @@ transponen al cambiar el tono.
   compás 4/4, 3/4, 6/8 o 2/4, y click con sonido opcional) y **desplazamiento automático** de la hoja, cuya
   velocidad se recuerda por canción. Mientras el dedo toca la pantalla no se desplaza. Sigue activo al pasar a la
   siguiente canción del setlist o del ensayo y se apaga al salir de las canciones.
-- **Vista por instrumento** (pestaña junto a Letra y Acordes; cada quien elige Bajo, Batería o Voces una vez en
-  su teléfono). *Bajo:* las notas del bajo por sección (la raíz o la nota de la diagonal, D/F# → F#), en el tono
+- **Vista por instrumento** (pestaña junto a Letra y Acordes; cada quien elige Voces, Acústica, Eléctrica, Piano,
+  Bajo o Batería una vez en su teléfono). *Piano:* cada acorde de la sección dibujado en un teclado (mano derecha
+  en posición cerrada y el bajo), con ▶ Escuchar. *Guitarras:* los acordes de la sección en orden con sus diagramas
+  (respetan el capo elegido en Acordes) y lo que toca cada guitarra (rasgueo, riff, efectos). *Bajo:* las notas del bajo por sección (la raíz o la nota de la diagonal, D/F# → F#), en el tono
   elegido. *Batería:* el mapa de la canción en orden, con compases, dinámica, notas, BPM y duración aproximada.
   *Voces:* quién canta cada sección, las armonías y la letra de esa parte. Las secciones salen de la hoja de acordes
   (`{c: CORO}`, `{start_of_verse}`…); el arreglo del equipo se anota en ✎ Editar → *Arreglo por sección* y se guarda
-  en la columna **Partes** de la pestaña Letras (`CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo`).
+  en la columna **Partes** de la pestaña Letras (`CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo | piano | eléctrica | acústica`; las tres últimas son opcionales).
   Mientras no esté anotado, los compases se estiman con un acorde por compás.
 - **🎸 Capo** en la vista de acordes: con el capo en el traste N la hoja y los diagramas muestran las formas que se
   tocan (Bb con capo 3 → formas de G) y el tono de arriba sigue siendo el que suena. La app sugiere el capo que deja

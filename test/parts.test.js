@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitReps, sheetSections, parseParts, serializeParts, arrangement, editableParts, bassNote } from '../js/parts.js';
+import { splitReps, sheetSections, parseParts, serializeParts, arrangement, editableParts, bassNote, pianoVoicing, midiName, keyboardSvg } from '../js/parts.js';
 
 const SHEET = `{title: Tú El Único Rey}
 {key: Bb}
@@ -65,4 +65,24 @@ test('nota del bajo', () => {
   assert.equal(bassNote('Gm7'), 'G');
   assert.equal(bassNote('Bb', 2, false), 'C');
   assert.equal(bassNote('Bb/D', -3, false), 'B');
+});
+
+test('Partes con columnas de piano y guitarras', () => {
+  const text = 'CORO | 8 | Fuerte | Todos | | octavas | riff con delay | abajo-arriba';
+  const [p] = parseParts(text);
+  assert.equal(p.note, '');
+  assert.equal(p.piano, 'octavas');
+  assert.equal(p.electrica, 'riff con delay');
+  assert.equal(p.acustica, 'abajo-arriba');
+  assert.deepEqual(parseParts(serializeParts([p])), [p]);
+  assert.equal(serializeParts(parseParts('VERSO | 8')), 'VERSO | 8');
+});
+
+test('acordes en el piano', () => {
+  const v = pianoVoicing('D/F#');
+  assert.deepEqual(v.right.map(midiName), ['D', 'A']);
+  assert.equal(midiName(v.bass), 'F#');
+  assert.deepEqual(pianoVoicing('Cmaj7').right, [60, 64, 67, 71]);
+  assert.equal(pianoVoicing('xyz'), null);
+  assert.ok(keyboardSvg(pianoVoicing('Bb'), 'Bb').includes('class="kw kr"'));
 });

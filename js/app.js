@@ -549,7 +549,7 @@ function renderSong(id, ctx = null, came = null) {
          <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
     tabs: `<pre class="sheet">${esc(tabs)}</pre>`,
-    parte: partsHtml(song, { instrument: inst ? instrument : '', shift: chordShift, flats, esc, canEdit: canEdit(), editHref: `#/editar/${encodeURIComponent(song.id)}${ctx ? `?volver=${encodeURIComponent(ctx.href(ctx.index))}` : ''}` }),
+    parte: partsHtml(song, { instrument: inst ? instrument : '', shift: chordShift, flats, esc, capo, shapeFlats: sheetFlats, diagrams: (set) => diagramsHtml(set, shapes ? keyName(shapes) : set[0], gtrPos), canEdit: canEdit(), editHref: `#/editar/${encodeURIComponent(song.id)}${ctx ? `?volver=${encodeURIComponent(ctx.href(ctx.index))}` : ''}` }),
   };
 
   const nextItem = ctx ? ctx.set.items[ctx.index + 1] : null;

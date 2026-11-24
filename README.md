@@ -35,7 +35,7 @@ Columnas que la app reconoce (por nombre, en cualquier orden; las demás se igno
 ### Letras y hojas de acordes
 
 Van en una pestaña aparte llamada **Letras** dentro de la misma hoja, para que la pestaña principal
-siga siendo fácil de leer. Columnas: **Canción** (igual que en la pestaña principal), **Letra**, **Acordes** y **Tabs**.
+siga siendo fácil de leer. Columnas: **Canción** (igual que en la pestaña principal), **Letra**, **Acordes**, **Tabs** y, opcional, **Partes** (el arreglo por sección).
 En la app, cada canción tiene las pestañas *Letra*, *Acordes* y, si hay, *Tabs*.
 
 **Desde Songbook Pro:** exporta la canción como `.cho` (ChordPro), ábrela como texto y pega todo en la columna
@@ -62,6 +62,13 @@ transponen al cambiar el tono.
   compás 4/4, 3/4, 6/8 o 2/4, y click con sonido opcional) y **desplazamiento automático** de la hoja, cuya
   velocidad se recuerda por canción. Mientras el dedo toca la pantalla no se desplaza. Sigue activo al pasar a la
   siguiente canción del setlist o del ensayo y se apaga al salir de las canciones.
+- **Vista por instrumento** (pestaña junto a Letra y Acordes; cada quien elige Bajo, Batería o Voces una vez en
+  su teléfono). *Bajo:* las notas del bajo por sección (la raíz o la nota de la diagonal, D/F# → F#), en el tono
+  elegido. *Batería:* el mapa de la canción en orden, con compases, dinámica, notas, BPM y duración aproximada.
+  *Voces:* quién canta cada sección, las armonías y la letra de esa parte. Las secciones salen de la hoja de acordes
+  (`{c: CORO}`, `{start_of_verse}`…); el arreglo del equipo se anota en ✎ Editar → *Arreglo por sección* y se guarda
+  en la columna **Partes** de la pestaña Letras (`CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo`).
+  Mientras no esté anotado, los compases se estiman con un acorde por compás.
 - **🎸 Capo** en la vista de acordes: con el capo en el traste N la hoja y los diagramas muestran las formas que se
   tocan (Bb con capo 3 → formas de G) y el tono de arriba sigue siendo el que suena. La app sugiere el capo que deja
   más acordes abiertos. Se guarda por canción en cada teléfono, y el PDF de acordes sale con el capo indicado.

@@ -966,3 +966,41 @@ body.stage .stagebar {
   .sbbeat i:first-child { width: 11px; height: 11px; }
   .sbrow button { padding: 8px 8px; min-width: 34px; }
 }
+
+/* ---------- vista por instrumento ("Mi parte") ---------- */
+.instsel { grid-template-columns: repeat(3, 1fr); margin: 10px 0; }
+.instsel button { opacity: 1; }
+.parts { font-size: calc(1rem * var(--fs, 1)); }
+.part { padding: 12px 14px; margin: 8px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.phead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plabel { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.85em; }
+.reps { color: var(--muted); font-weight: 600; }
+.pbars { color: var(--muted); font-size: 0.85em; margin-left: auto; }
+.pbars + .dyn { margin-left: 0; }
+.dyn { margin-left: auto; padding: 2px 10px; border-radius: 999px; font-size: 0.78em; font-weight: 600; border: 1px solid var(--line); }
+.dyn.soft { color: var(--muted); }
+.dyn.mid { border-color: var(--warn); }
+.dyn.up { background: color-mix(in srgb, var(--warn) 25%, transparent); border-color: var(--warn); }
+.dyn.loud { background: var(--bad); border-color: var(--bad); color: #fff; }
+.dyn.brk { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.bassline { margin: 8px 0 2px; font: 700 1.35em/1.35 var(--mono); color: var(--chord); word-spacing: 0.1em; }
+.pchords { margin: 0; color: var(--muted); font: 0.85em/1.4 var(--mono); white-space: pre-wrap; }
+.pvoices { margin: 8px 0 4px; font-weight: 600; }
+.plyrics { margin: 6px 0 0; font-family: var(--serif); line-height: 1.6; }
+.pnote { margin: 6px 0 0; color: var(--muted); font-size: 0.9em; font-style: italic; }
+.part .hint { margin: 6px 0 0; }
+.drumhead { display: flex; gap: 22px; margin: 8px 0 4px; }
+.drumhead > div { display: flex; flex-direction: column; }
+.drumhead .label { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.drumhead .big { font: 700 1.8rem/1.1 var(--serif); }
+.drummap { list-style: none; padding: 0; margin: 0; counter-reset: part; }
+.drummap .part { counter-increment: part; }
+.drummap .plabel::before { content: counter(part) '. '; color: var(--muted); }
+
+/* editor del arreglo */
+.partsedit .prow { display: grid; grid-template-columns: 1fr 64px; gap: 6px; padding: 10px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.partsedit .prow input, .partsedit .prow select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.partsedit .prow .full { grid-column: 1 / -1; }
+.partsedit .prow .pbtns { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; }
+.partsedit .prow .pbtns button { padding: 4px 12px; }
+.partsedit .ptools { display: flex; gap: 8px; flex-wrap: wrap; }

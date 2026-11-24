@@ -50,7 +50,7 @@ const MAIN_EDITABLE = [
   'Canción', 'Autor', 'Temas', 'Voz Principal', 'Católica?', 'Tonalidad Original',
   'Tonalidad Zamar', 'BPM', 'Estatus', 'Spotify',
 ];
-const LYRICS_EDITABLE = ['Letra', 'Acordes', 'Tabs'];
+const LYRICS_EDITABLE = ['Letra', 'Acordes', 'Tabs', 'Partes'];
 
 // ---------- menú en la hoja ----------
 function onOpen() {

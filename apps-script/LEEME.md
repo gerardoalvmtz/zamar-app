@@ -70,6 +70,13 @@ No hace falta ejecutar nada: basta con pegar el código nuevo y volver a impleme
 Los eventos de varios días usan la columna *Fecha fin*, que el script agrega sola la primera vez que se guarda uno.
 El programa, la minuta y las tareas de cada ensayo se guardan como texto JSON en la columna *Ensayo*, que también se agrega sola.
 
+## Arreglo por sección (vista por instrumento)
+
+El arreglo de cada canción (compases, dinámica, quién canta y notas por sección) se guarda en la columna
+*Partes* de la pestaña *Letras*, un renglón por sección: `CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo`.
+La columna se agrega sola la primera vez que alguien guarda un arreglo. Solo hay que pegar el código nuevo y
+volver a implementar como **Nueva versión**; con el código anterior, la app avisa que el arreglo no se guardó.
+
 ## Si cambias el código
 
 Después de pegar una versión nueva: **Implementar → Administrar implementaciones → editar (lápiz) →

@@ -4,6 +4,7 @@ import { setupApi, readBase64 } from './api.js';
 import { normalize } from './songs.js';
 import { parseKey, keyName } from './music.js';
 import { metadata } from './chordpro.js';
+import { editableParts, serializeParts, DYNAMICS } from './parts.js';
 
 const VOICES = ['', 'Hombre', 'Mujer', 'Ambos'];
 
@@ -48,7 +49,7 @@ export function setupEditing(ctx) {
       Estatus: s.status,
       Spotify: s.spotify,
     };
-    const texts = { Letra: s.lyrics || '', Acordes: s.chords || '', Tabs: s.tabs || '' };
+    const texts = { Letra: s.lyrics || '', Acordes: s.chords || '', Tabs: s.tabs || '', Partes: s.parts || '' };
     const done = back || (song ? `#/c/${encodeURIComponent(song.id)}` : '#/');
     document.title = `${song ? 'Editar' : 'Nueva canción'} · Zamar`;
     app.innerHTML = `
@@ -76,6 +77,16 @@ export function setupEditing(ctx) {
             ? `${area('Letra', 'Letra', texts.Letra, 8)}
                ${area('Acordes (ChordPro)', 'Acordes', texts.Acordes, 10, ' <button type="button" class="link" data-pick="cho">Cargar .cho</button>')}
                ${area('Tabs', 'Tabs', texts.Tabs, 6)}
+               <section class="partsedit">
+                 <h2>Arreglo por sección</h2>
+                 <p class="hint">Lo ven bajo, batería y voces en la pestaña de su instrumento. Una fila por sección, en el orden en que se toca.</p>
+                 <div id="partrows"></div>
+                 <div class="ptools">
+                   <button type="button" data-part="add">+ Agregar sección</button>
+                   <button type="button" class="ghost" data-part="fromsheet">Sacar de los acordes</button>
+                 </div>
+                 <textarea name="Partes" hidden>${esc(texts.Partes)}</textarea>
+               </section>
                <input type="file" id="chofile" accept=".cho,.chopro,.chordpro,.crd,.txt,text/plain" hidden>
                <section>
                  <h2>Adjuntar archivo</h2>
@@ -96,6 +107,7 @@ export function setupEditing(ctx) {
 
     const form = app.querySelector('#editor');
     const msg = (t) => (app.querySelector('#editmsg').textContent = t);
+    if (song) wireParts(form, song);
 
     app.querySelector('[data-pick="cho"]')?.addEventListener('click', () => app.querySelector('#chofile').click());
     app.querySelector('#chofile')?.addEventListener('change', async (e) => {
@@ -150,7 +162,16 @@ export function setupEditing(ctx) {
         if (!song) await api('addSong', { fields: { 'Canción': value('Canción'), ...mainChanges } });
         else {
           if (Object.keys(mainChanges).length) await api('updateSong', { title: song.title, fields: mainChanges });
-          if (Object.keys(textChanges).length) await api('updateTexts', { title: song.title, fields: textChanges });
+          if (Object.keys(textChanges).length) {
+            const res = await api('updateTexts', { title: song.title, fields: textChanges });
+            // El programa de Apps Script viejo ignora la columna Partes sin avisar.
+            if ('Partes' in textChanges && Array.isArray(res?.changed) && !res.changed.includes('Partes')) {
+              delete textChanges.Partes;
+              applyLocal(song, mainChanges, textChanges);
+              button.disabled = false;
+              return msg('Se guardó todo menos el arreglo: falta actualizar el programa de Apps Script (ver apps-script/LEEME.md).');
+            }
+          }
         }
         msg('Guardado. Puede tardar un minuto en aparecer en los teléfonos de los demás.');
         // La hoja tarda un poco en publicar el cambio; se vuelve a leer en segundo plano.
@@ -179,6 +200,58 @@ export function setupEditing(ctx) {
     if ('Letra' in texts) song.lyrics = texts.Letra;
     if ('Acordes' in texts) song.chords = texts.Acordes;
     if ('Tabs' in texts) song.tabs = texts.Tabs;
+    if ('Partes' in texts) song.parts = texts.Partes;
+  }
+
+  /**
+   * Editor del arreglo: filas con sección, compases, dinámica, voces y nota. Se guarda como
+   * texto en la columna "Partes" solo si alguien cambió algo (si no, la propuesta sacada de
+   * los acordes no se escribe en la hoja).
+   */
+  function wireParts(form, song) {
+    const box = form.querySelector('#partrows');
+    const out = form.elements.Partes;
+    let parts = editableParts(song);
+    const opt = (v, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v || 'Dinámica —')}</option>`;
+    const draw = () => {
+      box.innerHTML = parts
+        .map(
+          (p, i) => `<div class="prow" data-i="${i}">
+            <input data-f="label" value="${esc(p.label)}" placeholder="Sección (CORO, VERSO x2…)" aria-label="Sección">
+            <input data-f="bars" value="${p.bars || ''}" inputmode="numeric" placeholder="Comp." aria-label="Compases">
+            <select data-f="dynamic" class="full" aria-label="Dinámica">${['', ...DYNAMICS, ...(p.dynamic && !DYNAMICS.includes(p.dynamic) ? [p.dynamic] : [])].map((v) => opt(v, p.dynamic)).join('')}</select>
+            <input data-f="voices" class="full" value="${esc(p.voices)}" placeholder="Quién canta (Roberto; Ale 3ra arriba)" aria-label="Voces">
+            <input data-f="note" class="full" value="${esc(p.note)}" placeholder="Nota (entra el bombo, solo piano…)" aria-label="Nota">
+            <div class="pbtns">
+              <button type="button" class="ghost" data-part="up" aria-label="Subir" ${i ? '' : 'disabled'}>↑</button>
+              <button type="button" class="ghost" data-part="down" aria-label="Bajar" ${i < parts.length - 1 ? '' : 'disabled'}>↓</button>
+              <button type="button" class="ghost" data-part="del" aria-label="Quitar">✕</button>
+            </div>
+          </div>`,
+        )
+        .join('') || '<p class="hint">Sin secciones. Agrega una o sácalas de los acordes.</p>';
+    };
+    const changed = () => (out.value = serializeParts(parts));
+    draw();
+    box.addEventListener('input', (e) => {
+      const row = e.target.closest('.prow');
+      const f = e.target.dataset.f;
+      if (!row || !f) return;
+      parts[row.dataset.i][f] = f === 'bars' ? Number(e.target.value) || 0 : e.target.value;
+      changed();
+    });
+    form.querySelector('.partsedit').addEventListener('click', (e) => {
+      const a = e.target.closest('[data-part]')?.dataset.part;
+      if (!a) return;
+      const i = Number(e.target.closest('.prow')?.dataset.i);
+      if (a === 'add') parts.push({ label: '', bars: 0, dynamic: '', voices: '', note: '' });
+      else if (a === 'fromsheet') parts = editableParts({ chords: form.elements.Acordes.value, parts: '' });
+      else if (a === 'del') parts.splice(i, 1);
+      else if (a === 'up' && i > 0) [parts[i - 1], parts[i]] = [parts[i], parts[i - 1]];
+      else if (a === 'down' && i < parts.length - 1) [parts[i + 1], parts[i]] = [parts[i], parts[i + 1]];
+      draw();
+      if (a !== 'add') changed();
+    });
   }
 
   // ---------- importar varias hojas .cho de Songbook Pro ----------

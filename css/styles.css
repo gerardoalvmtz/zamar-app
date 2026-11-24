@@ -915,3 +915,54 @@ details.gtr[open] > summary { color: var(--text); }
 .colorsel { margin: 0 0 12px; }
 .colorsel .basesel { max-width: 340px; }
 .colorsel .hint { margin: 6px 0 0; }
+
+/* ---------- capo para guitarra ---------- */
+.capo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 4px; }
+.capo label { display: flex; align-items: center; gap: 6px; }
+.capo select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.capo button { padding: 6px 12px; font-size: 0.85rem; }
+.capohint strong { color: var(--chord); }
+
+/* ---------- modo escenario ---------- */
+.stagebtn { width: 100%; margin: 14px 0 4px; padding: 12px; font-weight: 600; }
+.stagebar { display: none; }
+body.stage .offstage { display: none !important; }
+body.stage main { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+body.stage .detail h1 { font-size: 1.5rem; }
+body.stage .keybox { padding: 10px 14px; }
+body.stage .stagebar {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 0.08);
+  backdrop-filter: blur(8px);
+}
+.sbrow { display: flex; align-items: center; gap: 6px; max-width: 720px; margin: 0 auto; }
+.sbrow + .sbrow { margin-top: 6px; }
+.sbrow button { padding: 8px 10px; min-width: 40px; }
+.sbrow #sbmetro { margin-left: auto; min-width: 52px; font-size: 1.1rem; }
+.sbrow #sbscroll { font-weight: 600; white-space: nowrap; }
+.sbrow .sbexit { margin-left: auto; }
+.sbbpm, .sbspeed { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.sbbpm b, .sbspeed b { color: var(--text); font-size: 1.05rem; }
+.sbbeat { display: flex; gap: 4px; margin-right: 2px; }
+.sbbeat i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); transition: background 0.05s; }
+.sbbeat i:first-child { width: 14px; height: 14px; }
+.sbbeat i.on { background: var(--chord); }
+.sbbeat i.on:first-child { background: var(--bad); }
+.sbwarn { margin: 6px auto 0; max-width: 720px; font-size: 0.8rem; color: var(--muted); }
+.stagebar.pulse { animation: sbpulse 0.18s ease-out; }
+.stagebar.down { animation: sbdown 0.22s ease-out; }
+@keyframes sbpulse { from { border-top-color: var(--chord); box-shadow: 0 -4px 0 color-mix(in srgb, var(--chord) 60%, transparent); } }
+@keyframes sbdown { from { border-top-color: var(--bad); box-shadow: 0 -8px 0 color-mix(in srgb, var(--bad) 70%, transparent); } }
+@media (max-width: 380px) {
+  .sbbeat i { width: 9px; height: 9px; }
+  .sbbeat i:first-child { width: 11px; height: 11px; }
+  .sbrow button { padding: 8px 8px; min-width: 34px; }
+}

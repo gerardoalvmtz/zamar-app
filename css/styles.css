@@ -912,3 +912,6 @@ details.gtr[open] > summary { color: var(--text); }
 .library .libctl { display: grid; grid-template-columns: 1fr; }
 .chordnav { display: flex; }
 .chorddialog .actions { display: flex; }
+.colorsel { margin: 0 0 12px; }
+.colorsel .basesel { max-width: 340px; }
+.colorsel .hint { margin: 6px 0 0; }

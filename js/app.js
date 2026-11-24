@@ -1,7 +1,8 @@
 import { sheetCsvUrl, LYRICS_GID } from './config.js';
 import { parseCsv, rowsToSongs, rowsToTexts, attachTexts, suggestions, normalize } from './songs.js';
 import { keyName, transposeKey, useFlats, semitonesBetween, parseKey, keyRelation } from './music.js';
-import { renderChordSheet, chordSheetLines, lyricsFromChords, tabsFromChords, renderLyrics, sheetKey } from './chordpro.js';
+import { renderChordSheet, chordSheetLines, lyricsFromChords, tabsFromChords, renderLyrics, sheetKey, chordsInSheet } from './chordpro.js';
+import { setupLibrary, songProgressions, majorOf, pretty, diagramsHtml, positionPicker, showChord } from './library.js';
 import {
   allSetlists,
   getSetlist,
@@ -228,6 +229,7 @@ function renderHome() {
     <div class="tiles">
       ${tile('#/canciones', '🎵', 'Canciones', `${state.songs.length} en el repertorio · ${ready} listas`)}
       ${tile('#/sets', '📋', 'Setlists', sets.length ? `${sets.length} en este teléfono` : 'Arma el de tu próximo evento')}
+      ${tile('#/progresiones', '🎼', 'Progresiones', 'Acordes en cualquier tono y diagramas de guitarra')}
       ${canEdit() ? tile('#/agenda', '📅', 'Agenda', 'Eventos y quién va') : ''}
       ${canEdit() ? tile('#/comp', '✍️', 'Composiciones', 'Ideas, audios y comentarios') : ''}
     </div>
@@ -484,12 +486,34 @@ function renderSong(id, ctx = null, came = null) {
       }).join('')
     : '';
 
+  // Guitarra: diagramas de los acordes de la canción (en el tono que se está viendo) y
+  // las progresiones conocidas que usa.
+  const gtrPos = Number(store.get('zamar:gtrpos', 1)) || 1;
+  const songChords = view === 'acordes' && song.chords ? chordsInSheet(song.chords, { shift: chordShift, flats, unique: true }) : [];
+  const usedProgs = view === 'acordes' && song.chords ? songProgressions(song.chords, written) : [];
+  const libKey = key ? keyName(majorOf(key)) : '';
+  const guitar = songChords.length
+    ? `<details class="gtr songgtr" ${store.get('zamar:gtropen', false) ? 'open' : ''}>
+         <summary>🎸 Diagramas de guitarra</summary>
+         ${positionPicker(gtrPos)}
+         ${diagramsHtml(songChords, key ? keyName(key) : songChords[0], gtrPos)}
+         <p class="hint">Toca cualquier acorde (aquí o en la hoja) para ver todas sus posiciones.</p>
+       </details>
+       ${
+         usedProgs.length
+           ? `<p class="hint progsused">🎼 Usa ${usedProgs
+               .map((h) => `<a href="#/progresiones?p=${encodeURIComponent(h.id)}&tono=${encodeURIComponent(libKey)}">${esc(pretty(h.progression))}</a>`)
+               .join(', ')}</p>`
+           : ''
+       }`
+    : '';
+
   const viewBody = {
     letra: lyrics
       ? `<div class="sheet lyrics">${renderLyrics(lyrics)}</div>`
       : '<p class="hint">Aún no hay letra cargada para esta canción.</p>',
     acordes: song.chords
-      ? `<div class="sheet">${renderChordSheet(song.chords, chordShift, flats)}</div>
+      ? `${guitar}<div class="sheet">${renderChordSheet(song.chords, chordShift, flats)}</div>
          <div class="row sheettools"><button data-action="chordspdf">📄 PDF de acordes${key ? ` en ${esc(keyName(key))}` : ''}</button></div>
          <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
@@ -681,6 +705,13 @@ function renderSong(id, ctx = null, came = null) {
     }),
   );
   wireFontSize();
+  app.querySelector('.songgtr')?.addEventListener('toggle', (e) => store.set('zamar:gtropen', e.target.open));
+  app.querySelectorAll('.songgtr [data-gpos]').forEach((b) =>
+    b.addEventListener('click', () => {
+      store.set('zamar:gtrpos', Number(b.dataset.gpos));
+      rerender();
+    }),
+  );
   app.querySelectorAll('[data-view]').forEach((b) =>
     b.addEventListener('click', () => {
       store.set('zamar:view', b.dataset.view);
@@ -1174,6 +1205,7 @@ function renderBridgePage(fromText = '', toText = '') {
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
 const rehearsals = canEdit() ? setupRehearsals({ app, store, esc }) : null;
+const library = setupLibrary({ app, store, esc, backHeader, songs: () => state.songs });
 const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
 // Setlists del equipo: viven en la hoja privada. Verlos y editarlos no pide PIN; borrarlos sí.
@@ -1255,6 +1287,7 @@ function route() {
     const shared = decodeSetlist(m[1]);
     if (shared) return () => renderSetlist('', shared);
   }
+  if ((m = h.match(/^#\/progresiones(?:\?(.*))?$/))) return () => library.render(new URLSearchParams(m[1] || ''));
   if (h === '#/sets') return renderSetlists;
   if (h === '#/canciones') return renderList;
   if ((m = h.match(/^#\/puente(?:\/([^/]*))?(?:\/([^/]*))?$/)))
@@ -1291,6 +1324,12 @@ app.addEventListener('input', (e) => {
 });
 
 app.addEventListener('click', async (e) => {
+  // Tocar un acorde (en la hoja o en los diagramas) muestra cómo se pone en la guitarra.
+  const chordTap = e.target.closest('.sheet .ch, .sheet .cp > .chord, [data-gchord]');
+  if (chordTap) {
+    showChord(chordTap.dataset.gchord || chordTap.textContent.trim().replace(/^\*/, ''));
+    return;
+  }
   const chip = e.target.closest('[data-group]');
   if (chip) {
     const g = chip.dataset.group;

@@ -147,6 +147,7 @@ export function rowsToTexts(rows) {
   const chords = col(['acordes', ...COLUMNS.chords]);
   const tabs = col(['tabs', 'tablaturas', 'tab', 'guitarra electrica']);
   const files = col(['archivos', 'adjuntos']);
+  const parts = col(['partes', 'arreglo']);
   if (title < 0 || (lyrics < 0 && chords < 0 && tabs < 0 && files < 0)) return texts;
   const cell = (row, i) => (i < 0 ? '' : String(row[i] ?? '').trim());
   for (const row of rows.slice(1)) {
@@ -157,6 +158,7 @@ export function rowsToTexts(rows) {
       chords: cell(row, chords),
       tabs: cell(row, tabs),
       files: parseFiles(cell(row, files)),
+      parts: cell(row, parts),
     });
   }
   return texts;
@@ -182,6 +184,7 @@ export function attachTexts(songs, texts) {
     song.chords = song.chords || t.chords;
     song.tabs = song.tabs || t.tabs;
     song.files = t.files;
+    song.parts = t.parts || '';
   }
   return songs;
 }

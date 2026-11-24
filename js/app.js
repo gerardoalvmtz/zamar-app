@@ -27,6 +27,7 @@ import { setupRehearsals } from './rehearsals.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
 import { playProgression, stopPlaying } from './progressions.js';
 import { stageButton, stageBar, wireStage, setupStage, stageNavigate } from './stage.js';
+import { partsHtml, INSTRUMENTS } from './parts.js';
 import { bestCapo, shapeKey, capoLabel, MAX_CAPO } from './capo.js';
 import { setlistImage, setlistPdf, chordsPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
@@ -472,7 +473,9 @@ function renderSong(id, ctx = null, came = null) {
 
   const lyrics = song.lyrics || lyricsFromChords(song.chords);
   const tabs = song.tabs || tabsFromChords(song.chords);
-  const views = ['letra', 'acordes', ...(tabs ? ['tabs'] : [])];
+  const views = ['letra', 'acordes', ...(tabs ? ['tabs'] : []), ...(song.chords || song.parts ? ['parte'] : [])];
+  const instrument = store.get('zamar:instrument', '');
+  const inst = INSTRUMENTS.find((i) => i.id === instrument);
   let view = store.get('zamar:view', 'letra');
   if (!views.includes(view)) view = 'letra';
   const notes = store.get(`zamar:notes:${song.id}`, '');
@@ -546,6 +549,7 @@ function renderSong(id, ctx = null, came = null) {
          <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
     tabs: `<pre class="sheet">${esc(tabs)}</pre>`,
+    parte: partsHtml(song, { instrument: inst ? instrument : '', shift: chordShift, flats, esc, canEdit: canEdit(), editHref: `#/editar/${encodeURIComponent(song.id)}${ctx ? `?volver=${encodeURIComponent(ctx.href(ctx.index))}` : ''}` }),
   };
 
   const nextItem = ctx ? ctx.set.items[ctx.index + 1] : null;
@@ -645,7 +649,7 @@ function renderSong(id, ctx = null, came = null) {
       <section>
         <div class="tabs" role="tablist" style="grid-template-columns: repeat(${views.length}, 1fr)">
           ${views
-            .map((v) => `<button role="tab" data-view="${v}" aria-selected="${view === v}">${{ letra: 'Letra', acordes: 'Acordes', tabs: 'Tabs' }[v]}</button>`)
+            .map((v) => `<button role="tab" data-view="${v}" aria-selected="${view === v}">${{ letra: 'Letra', acordes: 'Acordes', tabs: 'Tabs', parte: inst ? `${inst.icon} ${inst.label}` : 'Mi parte' }[v]}</button>`)
             .join('')}
         </div>
         ${view !== 'tabs' ? fontSizeControl() : ''}
@@ -752,6 +756,12 @@ function renderSong(id, ctx = null, came = null) {
   app.querySelectorAll('.songgtr [data-gpos]').forEach((b) =>
     b.addEventListener('click', () => {
       store.set('zamar:gtrpos', Number(b.dataset.gpos));
+      rerender();
+    }),
+  );
+  app.querySelectorAll('[data-inst]').forEach((b) =>
+    b.addEventListener('click', () => {
+      store.set('zamar:instrument', b.dataset.inst);
       rerender();
     }),
   );

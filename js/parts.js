@@ -2,15 +2,23 @@
 // Las secciones salen de la hoja de acordes ({c: CORO}, {start_of_verse}…). El arreglo del
 // equipo (compases, dinámica, quién canta y notas) vive en la columna "Partes" de la pestaña
 // Letras, un renglón por sección en el orden en que se toca:
-//   CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo
+//   CORO | 8 | Fuerte | Todos, Ale 3ra arriba | entra el bombo | piano | eléctrica | acústica
+// Las tres últimas (opcionales) son lo que hace cada instrumento: "arpegios en la mano derecha",
+// "riff de la intro con delay", "rasgueo abajo-abajo-arriba".
 import { isChord, isChordLine, transposeChord } from './music.js';
 import { normalize } from './songs.js';
+import { parseChord } from './guitar.js';
 
 export const INSTRUMENTS = [
-  { id: 'bajo', label: 'Bajo', icon: '🎸' },
-  { id: 'bateria', label: 'Batería', icon: '🥁' },
   { id: 'voces', label: 'Voces', icon: '🎤' },
+  { id: 'acustica', label: 'Acústica', icon: '🪕' },
+  { id: 'electrica', label: 'Eléctrica', icon: '🎸' },
+  { id: 'piano', label: 'Piano', icon: '🎹' },
+  { id: 'bajo', label: 'Bajo', icon: '🎶' },
+  { id: 'bateria', label: 'Batería', icon: '🥁' },
 ];
+// Columnas de cada renglón de "Partes", en orden.
+export const PART_FIELDS = ['label', 'bars', 'dynamic', 'voices', 'note', 'piano', 'electrica', 'acustica'];
 export const DYNAMICS = ['Suave', 'Media', 'Crece', 'Fuerte', 'Baja', 'Solo voces', 'Break'];
 
 const DIRECTIVE = /^\s*\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}\s*$/i;
@@ -86,8 +94,10 @@ export function parseParts(text) {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [label = '', bars = '', dynamic = '', voices = '', ...note] = line.split('|').map((x) => x.trim());
-      return { label, bars: Number(bars) || 0, dynamic, voices, note: note.join(' | ') };
+      const cells = line.split('|').map((x) => x.trim());
+      const p = Object.fromEntries(PART_FIELDS.map((f, i) => [f, cells[i] || '']));
+      p.bars = Number(p.bars) || 0;
+      return p;
     })
     .filter((p) => p.label);
 }
@@ -96,7 +106,7 @@ export function parseParts(text) {
 export function serializeParts(parts) {
   return parts
     .filter((p) => String(p.label || '').trim())
-    .map((p) => [p.label, p.bars || '', p.dynamic, p.voices, p.note].map((x) => String(x ?? '').replace(/[|\n]/g, ' ').trim()).join(' | ').replace(/(\s\|\s*)+$/, ''))
+    .map((p) => PART_FIELDS.map((f) => (f === 'bars' ? p.bars || '' : p[f])).map((x) => String(x ?? '').replace(/[|\n]/g, ' ').trim()).join(' | ').replace(/(\s\|\s*)+$/, ''))
     .join('\n');
 }
 
@@ -115,7 +125,7 @@ export function arrangement(song) {
   if (!parts.length) {
     return {
       annotated: false,
-      parts: sections.map((s) => ({ label: s.label, reps: s.reps, bars: 0, est: estimateBars(s), dynamic: '', voices: '', note: '', chords: s.chords, lines: s.lines, repeat: s.repeat })),
+      parts: sections.map((s) => ({ ...blank(), label: s.label, reps: s.reps, est: estimateBars(s), chords: s.chords, lines: s.lines, repeat: s.repeat })),
     };
   }
   const seen = new Set();
@@ -136,13 +146,53 @@ export function arrangement(song) {
 export function editableParts(song) {
   const parts = parseParts(song.parts);
   if (parts.length) return parts;
-  return sheetSections(song.chords).map((s) => ({
-    label: s.reps > 1 ? `${s.label} x${s.reps}` : s.label,
-    bars: estimateBars(s) || 0,
-    dynamic: '',
-    voices: '',
-    note: '',
-  }));
+  return sheetSections(song.chords).map((s) => ({ ...blank(), label: s.reps > 1 ? `${s.label} x${s.reps}` : s.label, bars: estimateBars(s) || 0 }));
+}
+
+/** Parte vacía con todas las columnas. */
+export const blank = () => ({ ...Object.fromEntries(PART_FIELDS.map((f) => [f, ''])), bars: 0 });
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/**
+ * Cómo tocar el acorde en piano: mano derecha en posición cerrada desde la raíz (alrededor del
+ * Do central) y el bajo en la octava de abajo. Devuelve MIDI: { right: [...], bass } o null.
+ */
+export function pianoVoicing(chord) {
+  const c = parseChord(chord);
+  if (!c) return null;
+  const pcs = c.tones.filter((pc) => c.bass === c.root || pc !== c.bass);
+  let n = 60 + c.root - (c.root > 7 ? 12 : 0);
+  const right = [n];
+  for (const pc of pcs.filter((pc) => pc !== c.root)) {
+    while (((n % 12) + 12) % 12 !== pc) n++;
+    right.push(n);
+  }
+  return { right: right.sort((a, b) => a - b), bass: 48 + c.bass - (c.bass > 7 ? 12 : 0) };
+}
+
+export const midiName = (m) => NOTE_NAMES[((m % 12) + 12) % 12];
+
+/** Teclado de dos octavas (Do3 a Si4 + lo que haga falta) con las notas del acorde marcadas. */
+export function keyboardSvg(v, label = '') {
+  if (!v) return '';
+  const lo = Math.min(v.bass, ...v.right) - (Math.min(v.bass, ...v.right) % 12); // desde un Do
+  const hi = Math.max(lo + 23, Math.max(...v.right));
+  const W = 11;
+  const H = 46;
+  const whites = [];
+  const blacks = [];
+  let x = 0;
+  for (let m = lo; m <= hi; m++) {
+    const black = [1, 3, 6, 8, 10].includes(m % 12);
+    const on = v.right.includes(m) ? 'r' : m === v.bass ? 'bass' : '';
+    if (black) blacks.push(`<rect x="${x - 3.5}" y="0" width="7" height="28" rx="1" class="kb k${on}"/>`);
+    else {
+      whites.push(`<rect x="${x}" y="0" width="${W}" height="${H}" rx="1.5" class="kw k${on}"/>`);
+      x += W;
+    }
+  }
+  return `<svg class="keys" viewBox="-1 -1 ${x + 2} ${H + 2}" role="img" aria-label="${label} en piano">${whites.join('')}${blacks.join('')}</svg>`;
 }
 
 /** Nota del bajo de un acorde (la de abajo de la diagonal, o la raíz). */
@@ -155,7 +205,7 @@ export function bassNote(chord, shift = 0, flats = false) {
 const DYN_CLASS = { suave: 'soft', baja: 'soft', 'solo voces': 'soft', media: 'mid', crece: 'up', fuerte: 'loud', break: 'brk' };
 
 /** Dibuja la pestaña "Mi parte" para el instrumento elegido. */
-export function partsHtml(song, { instrument, shift = 0, flats = false, esc, canEdit = false, editHref = '' }) {
+export function partsHtml(song, { instrument, shift = 0, flats = false, esc, canEdit = false, editHref = '', capo = 0, shapeFlats = flats, diagrams = null }) {
   const picker = `<div class="basesel seg instsel" role="tablist" aria-label="Instrumento">${INSTRUMENTS.map(
     (i) => `<button data-inst="${i.id}" aria-selected="${instrument === i.id}">${i.icon} ${i.label}</button>`,
   ).join('')}</div>`;
@@ -174,8 +224,65 @@ export function partsHtml(song, { instrument, shift = 0, flats = false, esc, can
         canEdit && editHref ? ` <a href="${editHref}">✎ Anotarlo</a>` : ' Se anota desde ✎ Editar.'
       }</p>`;
 
+  const uniq = (list) => [...new Set(list)];
+  const tr = (c, by = shift, f = flats) => (by ? transposeChord(c, by, f) : c);
+  const own = (p, field) => (p[field] ? `<p class="pown">${esc(p[field])}</p>` : '');
+
   let body = '';
-  if (instrument === 'bajo') {
+  if (instrument === 'piano') {
+    body = parts
+      .map((p) => {
+        const chords = uniq(p.chords.map((c) => tr(c)));
+        const voiced = chords.map((c) => ({ c, v: pianoVoicing(c) })).filter((x) => x.v);
+        // ▶ con el piano de la app: cada acorde de la sección, un compás cada uno.
+        const play = p.chords.map((c) => pianoVoicing(tr(c))).filter(Boolean).map((v) => [...v.right, v.bass]);
+        return `<div class="part">
+          <div class="phead"><span class="plabel">${esc(p.label)}${reps(p)}</span>${dyn(p)}</div>
+          ${own(p, 'piano')}
+          ${
+            p.repeat
+              ? `<p class="hint">Igual que antes: ${esc(chords.join(' · '))}</p>`
+              : voiced.length
+                ? `<div class="kbgrid">${voiced
+                    .map(
+                      ({ c, v }) => `<figure class="kbcell"><figcaption><strong>${esc(c)}</strong> <span>${esc(v.right.map(midiName).join(' '))} · bajo ${esc(midiName(v.bass))}</span></figcaption>${keyboardSvg(v, esc(c))}</figure>`,
+                    )
+                    .join('')}</div>
+                   <button type="button" class="ghost small" data-bridgeplay="${esc(JSON.stringify(play))}" data-bpm="${song.bpm || 72}">▶ Escuchar</button>`
+                : '<p class="hint">Sin acordes en esta sección.</p>'
+          }
+          ${note(p)}
+        </div>`;
+      })
+      .join('');
+    body = `<p class="hint">Cada acorde en el teclado: la mano derecha en posición cerrada (rojo) y el bajo en la mano izquierda (gris oscuro).</p>${body}`;
+  } else if (instrument === 'acustica' || instrument === 'electrica') {
+    const field = instrument;
+    const gShift = shift - capo;
+    body = parts
+      .map((p) => {
+        const chords = p.chords.map((c) => tr(c, gShift, shapeFlats));
+        const set = uniq(chords);
+        return `<div class="part">
+          <div class="phead"><span class="plabel">${esc(p.label)}${reps(p)}</span>${dyn(p)}</div>
+          ${own(p, field)}
+          ${
+            chords.length
+              ? `<p class="pchords gch">${chords.map((c) => `<span data-gchord="${esc(c)}">${esc(c)}</span>`).join(' ')}</p>
+                 ${!p.repeat && diagrams && set.length ? diagrams(set) : ''}`
+              : '<p class="hint">Sin acordes en esta sección.</p>'
+          }
+          ${note(p)}
+        </div>`;
+      })
+      .join('');
+    const head = [
+      capo ? `Con capo ${capo} (el que elegiste en Acordes).` : '',
+      'Toca un acorde para ver todas sus posiciones.',
+      instrument === 'electrica' && song.tabs ? 'Los riffs escritos están en la pestaña Tabs.' : '',
+    ].filter(Boolean);
+    body = `<p class="hint">${head.join(' ')}</p>${body}`;
+  } else if (instrument === 'bajo') {
     body = parts
       .map((p) => {
         const notes = p.chords.map((c) => bassNote(c, shift, flats)).filter(Boolean);

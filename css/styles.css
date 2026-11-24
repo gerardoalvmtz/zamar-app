@@ -1004,3 +1004,22 @@ body.stage .stagebar {
 .partsedit .prow .pbtns { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; }
 .partsedit .prow .pbtns button { padding: 4px 12px; }
 .partsedit .ptools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* piano y guitarras en "Mi parte" */
+.instsel { grid-template-columns: repeat(3, 1fr); border-radius: 18px; }
+.instsel button { border-radius: 14px; padding: 8px 4px; }
+.pown { margin: 8px 0 4px; font-weight: 600; }
+.kbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+.kbcell { margin: 0; }
+.kbcell figcaption { font-size: 0.8em; margin-bottom: 4px; }
+.kbcell figcaption span { color: var(--muted); }
+.keys { width: 100%; height: auto; display: block; }
+.keys .kw { fill: #fff; stroke: #8a857e; stroke-width: 0.6; }
+.keys .kb { fill: #1c1b1a; stroke: #1c1b1a; stroke-width: 0.6; }
+.keys .kr { fill: var(--bad); }
+.keys .kb.kr { fill: #b32d2d; }
+.keys .kbass { fill: #6d6a66; }
+.gch span { cursor: pointer; color: var(--chord); font-weight: 700; }
+.part .gdiags { margin-top: 8px; }
+.pinst summary { font-size: 0.85rem; color: var(--muted); cursor: pointer; padding: 4px 0; }
+.pinst input { margin-top: 6px; }

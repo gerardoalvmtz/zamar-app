@@ -4,7 +4,7 @@ import { setupApi, readBase64 } from './api.js';
 import { normalize } from './songs.js';
 import { parseKey, keyName } from './music.js';
 import { metadata } from './chordpro.js';
-import { editableParts, serializeParts, DYNAMICS } from './parts.js';
+import { editableParts, serializeParts, DYNAMICS, blank } from './parts.js';
 
 const VOICES = ['', 'Hombre', 'Mujer', 'Ambos'];
 
@@ -221,7 +221,13 @@ export function setupEditing(ctx) {
             <input data-f="bars" value="${p.bars || ''}" inputmode="numeric" placeholder="Comp." aria-label="Compases">
             <select data-f="dynamic" class="full" aria-label="Dinámica">${['', ...DYNAMICS, ...(p.dynamic && !DYNAMICS.includes(p.dynamic) ? [p.dynamic] : [])].map((v) => opt(v, p.dynamic)).join('')}</select>
             <input data-f="voices" class="full" value="${esc(p.voices)}" placeholder="Quién canta (Roberto; Ale 3ra arriba)" aria-label="Voces">
-            <input data-f="note" class="full" value="${esc(p.note)}" placeholder="Nota (entra el bombo, solo piano…)" aria-label="Nota">
+            <input data-f="note" class="full" value="${esc(p.note)}" placeholder="Nota para todos (entra el bombo…)" aria-label="Nota">
+            <details class="full pinst" ${p.acustica || p.electrica || p.piano ? 'open' : ''}>
+              <summary>Guitarras y piano</summary>
+              <input data-f="acustica" value="${esc(p.acustica)}" placeholder="🪕 Acústica (rasgueo, arpegio…)" aria-label="Guitarra acústica">
+              <input data-f="electrica" value="${esc(p.electrica)}" placeholder="🎸 Eléctrica (riff, delay, swells…)" aria-label="Guitarra eléctrica">
+              <input data-f="piano" value="${esc(p.piano)}" placeholder="🎹 Piano (arpegios, pad, octavas…)" aria-label="Piano">
+            </details>
             <div class="pbtns">
               <button type="button" class="ghost" data-part="up" aria-label="Subir" ${i ? '' : 'disabled'}>↑</button>
               <button type="button" class="ghost" data-part="down" aria-label="Bajar" ${i < parts.length - 1 ? '' : 'disabled'}>↓</button>
@@ -244,7 +250,7 @@ export function setupEditing(ctx) {
       const a = e.target.closest('[data-part]')?.dataset.part;
       if (!a) return;
       const i = Number(e.target.closest('.prow')?.dataset.i);
-      if (a === 'add') parts.push({ label: '', bars: 0, dynamic: '', voices: '', note: '' });
+      if (a === 'add') parts.push(blank());
       else if (a === 'fromsheet') parts = editableParts({ chords: form.elements.Acordes.value, parts: '' });
       else if (a === 'del') parts.splice(i, 1);
       else if (a === 'up' && i > 0) [parts[i - 1], parts[i]] = [parts[i], parts[i - 1]];

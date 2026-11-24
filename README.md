@@ -57,6 +57,14 @@ transponen al cambiar el tono.
 - Sugerir canciones para conectar según la tonalidad (misma, relativa, quinta/cuarta, subir medio tono o un tono),
   el BPM y el tema.
 - Notas personales que se guardan solo en el teléfono de cada quien.
+- **🎤 Modo escenario** (botón en cada canción): la pantalla no se apaga, se esconde lo que no se usa al tocar y
+  abajo queda una barra con **metrónomo** al BPM de la canción (destello en pantalla con el primer tiempo marcado,
+  compás 4/4, 3/4, 6/8 o 2/4, y click con sonido opcional) y **desplazamiento automático** de la hoja, cuya
+  velocidad se recuerda por canción. Mientras el dedo toca la pantalla no se desplaza. Sigue activo al pasar a la
+  siguiente canción del setlist o del ensayo y se apaga al salir de las canciones.
+- **🎸 Capo** en la vista de acordes: con el capo en el traste N la hoja y los diagramas muestran las formas que se
+  tocan (Bb con capo 3 → formas de G) y el tono de arriba sigue siendo el que suena. La app sugiere el capo que deja
+  más acordes abiertos. Se guarda por canción en cada teléfono, y el PDF de acordes sale con el capo indicado.
 - Setlists para eventos, del equipo: con el programa de Apps Script se guardan en la hoja privada y todos los ven;
   verlos, crearlos y editarlos no pide PIN, borrarlos sí. Se arman buscando la canción por nombre o por tema y eligiendo el tono
   (el de Zamar por defecto). Se comparten con un link, como imagen PNG (canciones, tonos y BPM) o como PDF con

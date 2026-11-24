@@ -209,7 +209,7 @@ export function voicing(c) {
  */
 let unmuted = false;
 let silent = null;
-function unmuteIos() {
+export function unmuteIos() {
   if (silent) return silent.play().catch(() => {});
   if (unmuted) return;
   unmuted = true;

@@ -26,6 +26,8 @@ import { setupAgenda } from './agenda.js';
 import { setupRehearsals } from './rehearsals.js';
 import { bridges, bridgeHtml, tempoTip, CLOSENESS } from './bridges.js';
 import { playProgression, stopPlaying } from './progressions.js';
+import { stageButton, stageBar, wireStage, setupStage, stageNavigate } from './stage.js';
+import { bestCapo, shapeKey, capoLabel, MAX_CAPO } from './capo.js';
 import { setlistImage, setlistPdf, chordsPdf, shareFile, qrCanvas, qrPoster, fileName } from './setshare.js';
 
 const CACHE_KEY = 'zamar:repertorio';
@@ -492,19 +494,34 @@ function renderSong(id, ctx = null, came = null) {
   // "Darle color": solo cambia cómo se ve en este teléfono; la hoja no se toca.
   const colored = Boolean(song.chords && written && store.get(`zamar:color:${song.id}`, false));
   const sheetText = colored ? colorSheet(song.chords, written) : song.chords;
-  const songChords = view === 'acordes' && song.chords ? chordsInSheet(sheetText, { shift: chordShift, flats, unique: true }) : [];
+  // Capo: la hoja y los diagramas muestran las formas que se tocan; el tono de arriba es el que suena.
+  const capo = song.chords ? Math.min(Number(store.get(`zamar:capo:${song.id}`, 0)) || 0, MAX_CAPO) : 0;
+  const shapes = capo && key ? shapeKey(key, capo) : key;
+  const sheetShift = chordShift - capo;
+  const sheetFlats = capo ? useFlats(shapes) : flats;
+  const songChords = view === 'acordes' && song.chords ? chordsInSheet(sheetText, { shift: sheetShift, flats: sheetFlats, unique: true }) : [];
+  const suggestedCapo = view === 'acordes' && song.chords ? bestCapo(chordsInSheet(sheetText, { shift: chordShift, flats }), key).capo : 0;
+  const capoBox =
+    view === 'acordes' && song.chords
+      ? `<div class="capo">
+           <label>🎸 <select id="capo" aria-label="Capo">${Array.from({ length: MAX_CAPO + 1 }, (_, n) => `<option value="${n}" ${n === capo ? 'selected' : ''}>${esc(capoLabel(key, n))}</option>`).join('')}</select></label>
+           ${suggestedCapo && suggestedCapo !== capo ? `<button class="ghost" data-capo="${suggestedCapo}">Sugerido: capo ${suggestedCapo}${key ? ` (formas de ${esc(keyName(shapeKey(key, suggestedCapo)))})` : ''}</button>` : ''}
+           ${capo ? `<button class="ghost" data-capo="0">Quitar capo</button>` : ''}
+         </div>
+         ${capo ? `<p class="hint capohint">Capo en el traste ${capo}: tocas las formas de <strong>${esc(keyName(shapes) || '—')}</strong> y suena en <strong>${esc(keyName(key) || 'el tono de la hoja')}</strong>. Solo se ve así en este teléfono.</p>` : ''}`
+      : '';
   const usedProgs = view === 'acordes' && song.chords ? songProgressions(song.chords, written) : [];
   const libKey = key ? keyName(majorOf(key)) : '';
   const guitar = songChords.length
     ? `<details class="gtr songgtr" ${store.get('zamar:gtropen', false) ? 'open' : ''}>
          <summary>🎸 Diagramas de guitarra</summary>
          ${positionPicker(gtrPos)}
-         ${diagramsHtml(songChords, key ? keyName(key) : songChords[0], gtrPos)}
+         ${diagramsHtml(songChords, shapes ? keyName(shapes) : songChords[0], gtrPos)}
          <p class="hint">Toca cualquier acorde (aquí o en la hoja) para ver todas sus posiciones.</p>
        </details>
        ${
          usedProgs.length
-           ? `<p class="hint progsused">🎼 Usa ${usedProgs
+           ? `<p class="hint progsused offstage">🎼 Usa ${usedProgs
                .map((h) => `<a href="#/progresiones?p=${encodeURIComponent(h.id)}&tono=${encodeURIComponent(libKey)}">${esc(pretty(h.progression))}</a>`)
                .join(', ')}</p>`
            : ''
@@ -518,14 +535,14 @@ function renderSong(id, ctx = null, came = null) {
     acordes: song.chords
       ? `${
           written
-            ? `<div class="colorsel"><div class="basesel seg" role="tablist" aria-label="Acordes">
+            ? `<div class="colorsel offstage"><div class="basesel seg" role="tablist" aria-label="Acordes">
                  <button data-color="0" aria-selected="${!colored}">Originales</button>
                  <button data-color="1" aria-selected="${colored}">🎨 Con color</button>
                </div>
                ${colored ? '<p class="hint">Con color: el I con novena (add9), el IV con séptima mayor, el V suspendido y los menores con séptima. Solo se ve así en este teléfono; la hoja no cambia.</p>' : ''}</div>`
             : ''
-        }${guitar}<div class="sheet">${renderChordSheet(sheetText, chordShift, flats)}</div>
-         <div class="row sheettools"><button data-action="chordspdf">📄 PDF de acordes${key ? ` en ${esc(keyName(key))}` : ''}</button></div>
+        }${capoBox}${guitar}<div class="sheet">${renderChordSheet(sheetText, sheetShift, sheetFlats)}</div>
+         <div class="row sheettools offstage"><button data-action="chordspdf">📄 PDF de acordes${key ? ` en ${esc(keyName(key))}` : ''}</button></div>
          <p class="hint" id="pdfmsg"></p>`
       : '<p class="hint">Aún no hay hoja de acordes para esta canción.</p>',
     tabs: `<pre class="sheet">${esc(tabs)}</pre>`,
@@ -582,13 +599,13 @@ function renderSong(id, ctx = null, came = null) {
     ${nav}
     <article class="detail">
       <h1>${esc(song.title)}</h1>
-      <p class="author">${esc(song.author || 'Autor sin registrar')}</p>
-      ${song.voice ? `<p class="voice">Voz principal: <strong>${esc(song.voice)}</strong></p>` : ''}
-      <p class="chips">
+      <p class="author offstage">${esc(song.author || 'Autor sin registrar')}</p>
+      ${song.voice ? `<p class="voice offstage">Voz principal: <strong>${esc(song.voice)}</strong></p>` : ''}
+      <p class="chips offstage">
         ${song.themes.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
         ${song.catholic ? '<span class="chip catholic">Católica</span>' : ''}
       </p>
-      <p class="status"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}
+      <p class="status offstage"><span class="dot ${statusClass(song.status)}"></span> ${esc(song.status || 'Sin estatus')}
         ${canEdit() ? `<a class="editlink" href="#/editar/${encodeURIComponent(song.id)}${ctx ? `?volver=${encodeURIComponent(ctx.href(ctx.index))}` : ''}">✎ Editar</a>` : ''}</p>
 
       <section class="card keybox">
@@ -602,7 +619,7 @@ function renderSong(id, ctx = null, came = null) {
                </div>
                ${
                  hasBoth && !ctx
-                   ? `<div class="basesel" role="tablist">
+                   ? `<div class="basesel offstage" role="tablist">
                         <button data-base="zamar" aria-selected="${baseChoice === 'zamar'}">Zamar · ${esc(keyName(song.keyZamar))}</button>
                         <button data-base="original" aria-selected="${baseChoice === 'original'}">Original · ${esc(keyName(song.keyOriginal))}</button>
                       </div>`
@@ -619,10 +636,11 @@ function renderSong(id, ctx = null, came = null) {
         <div class="keynow"><span class="label">BPM</span><span class="big ${song.bpm ? '' : 'muted'}">${song.bpm || '—'}</span></div>
       </section>
 
-      ${cameFrom}
-      ${safeUrl(song.spotify) ? `<section class="listen">${spotifyEmbed(song.spotify) || `<a class="button" href="${esc(song.spotify)}" target="_blank" rel="noopener">Escuchar en Spotify</a>`}</section>` : ''}
-      ${safeUrl(song.link) ? `<section class="listen"><a class="button ghost" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
-      ${rehearsals ? rehearsals.html(song) : ''}
+      ${stageButton()}
+      <div class="offstage">${cameFrom}</div>
+      ${safeUrl(song.spotify) ? `<section class="listen offstage">${spotifyEmbed(song.spotify) || `<a class="button" href="${esc(song.spotify)}" target="_blank" rel="noopener">Escuchar en Spotify</a>`}</section>` : ''}
+      ${safeUrl(song.link) ? `<section class="listen offstage"><a class="button ghost" href="${esc(song.link)}" target="_blank" rel="noopener">Escuchar referencia</a></section>` : ''}
+      ${rehearsals ? `<div class="offstage">${rehearsals.html(song)}</div>` : ''}
 
       <section>
         <div class="tabs" role="tablist" style="grid-template-columns: repeat(${views.length}, 1fr)">
@@ -636,18 +654,18 @@ function renderSong(id, ctx = null, came = null) {
 
       ${
         song.files?.length
-          ? `<section><h2>Archivos</h2><div class="chips">${song.files
+          ? `<section class="offstage"><h2>Archivos</h2><div class="chips">${song.files
               .filter((f) => safeUrl(f.url))
               .map((f) => `<a class="chip" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`)
               .join('')}</div></section>`
           : ''
       }
-      ${song.notes ? `<section><h2>Notas del equipo</h2><p class="teamnotes">${esc(song.notes)}</p></section>` : ''}
+      ${song.notes ? `<section class="stagenotes"><h2>Notas del equipo</h2><p class="teamnotes">${esc(song.notes)}</p></section>` : ''}
 
       ${
         ctx
           ? ''
-          : `<section>
+          : `<section class="offstage">
         <h2>Agregar a setlist</h2>
         <div class="row addset">
           <select id="setsel" aria-label="Setlist">
@@ -660,13 +678,13 @@ function renderSong(id, ctx = null, came = null) {
       </section>`
       }
 
-      <section>
+      <section class="stagenotes">
         <h2>Mis notas</h2>
         <textarea id="notes" rows="4" placeholder="Solo se guardan en este teléfono">${esc(notes)}</textarea>
         <p class="hint" id="saved"></p>
       </section>
 
-      ${ctx ? `<details class="connect"><summary>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</summary>` : `<section><h2>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</h2>`}
+      ${ctx ? `<details class="connect offstage"><summary>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</summary>` : `<section class="offstage"><h2>Para conectar${key ? ` desde ${esc(keyName(key))}` : ''}</h2>`}
         ${key ? `<p class="hint"><a href="#/puente/${encodeURIComponent(keyName(key))}">🧭 Ver el puente hacia cualquier tono</a></p>` : ''}
         ${
           !key
@@ -691,11 +709,19 @@ function renderSong(id, ctx = null, came = null) {
       ${ctx ? '</details>' : '</section>'}
       ${nextUp}
     </article>
-    ${nav}`);
+    ${nav}
+    ${stageBar()}`);
 
   const rerender = () => renderSong(song.id, ctx && ctx.reload(), came);
   hydrateSpotify();
   rehearsals?.wire(song);
+  wireStage(app, song);
+  const setCapo = (n) => {
+    store.set(`zamar:capo:${song.id}`, n);
+    rerender();
+  };
+  app.querySelector('#capo')?.addEventListener('change', (e) => setCapo(Number(e.target.value)));
+  app.querySelectorAll('[data-capo]').forEach((b) => b.addEventListener('click', () => setCapo(Number(b.dataset.capo))));
   const moveKey = (d) => {
     if (ctx) {
       ctx.set.items[ctx.index].key = keyName(transposeKey(key, d));
@@ -738,11 +764,11 @@ function renderSong(id, ctx = null, came = null) {
   app.querySelector('[data-action="chordspdf"]')?.addEventListener('click', async (ev) => {
     const b = ev.currentTarget;
     const out = document.getElementById('pdfmsg');
-    const keyText = key ? keyName(key) : '';
+    const keyText = key ? `${keyName(key)}${capo ? ` · capo ${capo} (formas de ${keyName(shapes)})` : ''}` : capo ? `capo ${capo}` : '';
     b.disabled = true;
     out.textContent = 'Preparando el PDF…';
     try {
-      const blob = await chordsPdf(song, keyText, chordSheetLines(sheetText, chordShift, flats));
+      const blob = await chordsPdf(song, keyText, chordSheetLines(sheetText, sheetShift, sheetFlats));
       const how = await shareFile(blob, { name: `${song.title} acordes ${keyText}` }, 'pdf', 'application/pdf');
       out.textContent = how === 'downloaded' ? 'PDF descargado.' : '';
     } catch (err) {
@@ -1222,6 +1248,7 @@ function renderBridgePage(fromText = '', toText = '') {
 const editing = canEdit() ? setupEditing({ app, state, store, esc, backHeader, songById, loadSongs }) : null;
 const comps = canEdit() ? setupCompositions({ app, store, esc, backHeader, homeHeader, loadSongs }) : null;
 const rehearsals = canEdit() ? setupRehearsals({ app, store, esc }) : null;
+setupStage(store);
 const library = setupLibrary({ app, store, esc, backHeader, songs: () => state.songs });
 const agenda = canEdit() ? setupAgenda({ app, store, esc, backHeader, homeHeader, songs: () => state.songs }) : null;
 
@@ -1322,6 +1349,7 @@ function render({ navigated = false } = {}) {
 
 window.addEventListener('hashchange', () => {
   stopPlaying();
+  stageNavigate(location.hash);
   render({ navigated: true });
   if (/^#\/(sets|set\/[^/]+)$/.test(location.hash)) syncSets();
 });
